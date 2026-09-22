@@ -1,16 +1,6 @@
 name: Build custom analysis images
 on:
   workflow_dispatch:
-    inputs:
-      dorado_image:
-        description: Digest-pinned oncoseq Dorado base image
-        required: true
-      rust_image:
-        description: Digest-pinned Rust bookworm builder
-        required: true
-      runtime_image:
-        description: Digest-pinned Debian bookworm-slim runtime
-        required: true
 permissions:
   contents: read
 env:
@@ -34,23 +24,38 @@ jobs:
           fi
       - run: python3 bin/bootstrap.py
       - run: python3 bin/check_dependencies.py
-      - name: Check immutable base inputs
-        env:
-          DORADO: ${{ inputs.dorado_image }}
-          RUST: ${{ inputs.rust_image }}
-          RUNTIME: ${{ inputs.runtime_image }}
-        run: |
-          python3 - <<'PY'
-          import os, re
-          for name in ['DORADO','RUST','RUNTIME']:
-              assert re.fullmatch(r'[^\s]+@sha256:[a-f0-9]{64}', os.environ[name]), name
-          PY
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Resolve configured base images
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, re, subprocess
+          from pathlib import Path
+          sources = json.loads(Path('assets/container_bases.json').read_text())
+          locked = {}
+          for name, source in sources.items():
+              result = subprocess.check_output(
+                  ['docker', 'buildx', 'imagetools', 'inspect', source], text=True)
+              match = re.search(r'^Digest:\s+(sha256:[a-f0-9]{64})\s*$', result, re.M)
+              if not match:
+                  raise SystemExit(f'{name}: registry did not return a digest')
+              repository = source.split('@')[0]
+              if ':' in repository.rsplit('/', 1)[-1]:
+                  repository = repository.rsplit(':', 1)[0]
+              locked[name] = repository + '@' + match.group(1)
+          Path('container-bases.lock.json').write_text(json.dumps(locked, indent=2) + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as handle:
+              for name, reference in locked.items():
+                  handle.write(f'{name.upper()}_IMAGE={reference}\n')
+          PYTHON
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-base-lock
+          path: container-bases.lock.json
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -59,7 +64,7 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_ROOT }}:preprocess-${{ github.sha }}
           build-args: |
-            DORADO_IMAGE=${{ inputs.dorado_image }}
+            DORADO_IMAGE=${{ env.DORADO_IMAGE }}
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -68,8 +73,8 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_ROOT }}:nasvar-${{ github.sha }}
           build-args: |
-            RUST_IMAGE=${{ inputs.rust_image }}
-            RUNTIME_IMAGE=${{ inputs.runtime_image }}
+            RUST_IMAGE=${{ env.RUST_IMAGE }}
+            RUNTIME_IMAGE=${{ env.RUNTIME_IMAGE }}
       - name: Resolve release candidate image lock
         run: |
           python3 bin/lock_images.py \

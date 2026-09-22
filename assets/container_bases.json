@@ -1,0 +1,5 @@
+{
+  "dorado": "ghcr.io/chusj-pigu/dorado:851b0a37ecbff6b3b952c811b31dad48ca6bf995",
+  "rust": "docker.io/library/rust:1.90.0-bookworm",
+  "runtime": "docker.io/library/debian:bookworm-slim"
+}

@@ -60,14 +60,17 @@ gh secret set DOCKERHUB_USERNAME --repo dbuckleychla/FrankONTstein
 gh secret set DOCKERHUB_TOKEN --repo dbuckleychla/FrankONTstein
 ```
 
-After pushing the workflow changes, resolve the three base image digests as
-described above, then dispatch with those references:
+After pushing the workflow changes, dispatch without any inputs. The job reads
+`assets/container_bases.json`, resolves all three references to immutable digests,
+and builds using only those resolved digests. Dorado uses the recorded oncoseq
+image tag; Rust uses version 1.90.0 on bookworm; Debian uses bookworm-slim.
+These source tags are not immutable pins across runs. The job saves the exact
+references as the `container-base-lock` artifact before building. To freeze bases
+across future runs, replace the source references in that JSON with the recorded
+digest references.
 
 ```bash
-gh workflow run containers.yml --repo dbuckleychla/FrankONTstein \
-  -f dorado_image="$DORADO_IMAGE" \
-  -f rust_image="$RUST_IMAGE" \
-  -f runtime_image="$RUNTIME_IMAGE"
+gh workflow run containers.yml --repo dbuckleychla/FrankONTstein
 gh run list --repo dbuckleychla/FrankONTstein --workflow containers.yml
 ```
 
