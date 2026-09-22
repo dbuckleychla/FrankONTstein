@@ -1,4 +1,6 @@
 {
+  "preprocess": null,
+  "nasvar": null,
   "classy": "ghcr.io/chusj-pigu/classy-slim:sha-71c699b",
   "bcftools": "ghcr.io/chusj-pigu/bcftools:latest",
   "clair3": "ghcr.io/chusj-pigu/clair3:5c1b224addf317c2cfe5ab5e03f6cdb23da13303",

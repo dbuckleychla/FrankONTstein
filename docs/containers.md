@@ -6,6 +6,15 @@ Use one OCI image per tool. Docker runs those images locally and on AWS Batch; A
 
 Two small custom images are needed:
 
+The source inventory includes `preprocess` and `nasvar` as `null` because those
+custom images have not been published. Supply their actual registry references
+using the required `--preprocess` and `--nasvar` arguments to `bin/lock_images.py`;
+these replace the null entries before resolution. The source inventory is not a
+runnable `--image_manifest`: the generated lock must contain real digest-pinned
+references. There are 13 image entries in the complete inventory. Dorado,
+samtools, and pysam share the preprocessing image; methylation processing uses
+the Classy image, so these do not require separate entries.
+
 1. `docker/preprocess/Dockerfile`: build on oncoseq's Dorado image, adding samtools and Python/pysam for BAM/reference checks.
 2. `docker/nasvar/Dockerfile`: build NASVAR with `cargo build --release --locked` from the pinned submodule, with its full non-commercial notice in the runtime layer.
 
@@ -32,6 +41,41 @@ python3 bin/lock_images.py --preprocess "$PREPROCESS_IMAGE" \
 ```
 
 The utility reads registry metadata only; it does not build, run or publish images. Override the source JSON for private mirrors or ECR. Classifier weights inside an upstream image still retain their own terms: verify redistribution rights before mirroring. For restricted weights, use an appropriately licensed private Classy image with the model layout expected by oncoseq's Classy module.
+
+## GitHub Actions publishing to Docker Hub
+
+The manually triggered `Build custom analysis images` workflow publishes both
+custom images to the single Docker Hub repository `dbuckley/frankontstein`, using
+tags `preprocess-<git commit>` and `nasvar-<git commit>`. It does not run on pull
+requests or ordinary pushes. Create that repository on Docker Hub and make it
+public for unauthenticated user pulls.
+
+Set repository Actions secrets `DOCKERHUB_USERNAME` (the Docker Hub login with
+write access to that repository) and `DOCKERHUB_TOKEN` (a Docker Hub access token
+with write permission). GitHub's built-in token cannot authenticate to Docker Hub.
+Using the GitHub CLI, enter each value at the hidden prompt:
+
+```bash
+gh secret set DOCKERHUB_USERNAME --repo dbuckleychla/FrankONTstein
+gh secret set DOCKERHUB_TOKEN --repo dbuckleychla/FrankONTstein
+```
+
+After pushing the workflow changes, resolve the three base image digests as
+described above, then dispatch with those references:
+
+```bash
+gh workflow run containers.yml --repo dbuckleychla/FrankONTstein \
+  -f dorado_image="$DORADO_IMAGE" \
+  -f rust_image="$RUST_IMAGE" \
+  -f runtime_image="$RUNTIME_IMAGE"
+gh run list --repo dbuckleychla/FrankONTstein --workflow containers.yml
+```
+
+Download the successful run's `candidate-image-lock` artifact for its generated
+`images.lock.json`. The lock includes both custom images and the upstream caller
+images. Test those images before declaring the lock release-ready. If upstream
+digest resolution fails after the builds, the custom images may already have
+been pushed; inspect the run log before retrying.
 
 The task scripts under `bin/` are staged by Nextflow. The preprocessing image supplies Python/pysam; the NASVAR image supplies Python. CPU-only execution is the default. Native ARM64 support has not been validated across upstream images.
 
