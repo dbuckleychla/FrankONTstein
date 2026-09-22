@@ -15,7 +15,9 @@ references. There are 13 image entries in the complete inventory. Dorado,
 samtools, and pysam share the preprocessing image; methylation processing uses
 the Classy image, so these do not require separate entries.
 
-1. `docker/preprocess/Dockerfile`: build on oncoseq's Dorado image, adding samtools and Python/pysam for BAM/reference checks.
+1. `docker/preprocess/Dockerfile`: build on oncoseq's Rocky Linux 9 Dorado image,
+   installing dependencies with `dnf`, compiling samtools 1.21 from its release
+   archive, and installing the pysam 0.23.3 wheel for BAM/reference checks.
 2. `docker/nasvar/Dockerfile`: build NASVAR with `cargo build --release --locked` from the pinned submodule, with its full non-commercial notice in the runtime layer.
 
 Build from the repository root after bootstrapping. Resolve the base references first with `docker buildx imagetools inspect`; use their real digests below:
