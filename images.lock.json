@@ -1,0 +1,15 @@
+{
+  "preprocess": "ghcr.io/dbuckleychla/frankontstein@sha256:d4015def219706d270a278859f0be561e840569b8dbcd5c046df4319be522e07",
+  "nasvar": "ghcr.io/dbuckleychla/frankontstein@sha256:4f2a409705a981cd43b007db1f67d4e6d860e373984273731f714a6eb54145db",
+  "classy": "ghcr.io/chusj-pigu/classy-slim@sha256:7ec5fc1e4607be13d30dc65a1b07f2844f8289edbec0ca67a70e9b88ef8beb4c",
+  "bcftools": "ghcr.io/chusj-pigu/bcftools@sha256:fe6207fca0e32886ea4161b7b55d0927947658f911b2dccc7e2b590ca7483b48",
+  "clair3": "ghcr.io/chusj-pigu/clair3@sha256:e02a63cb7eef4c69291f13adab59f5203a3cf68511572db66f962d381084efed",
+  "clairsto": "ghcr.io/chusj-pigu/clairsto@sha256:422748e4d3bfe420d896f56c32836a3113adb7820f60ebef7712dc306a3d3384",
+  "sniffles": "ghcr.io/chusj-pigu/sniffles@sha256:8830bdc7d5bfb4e592a27ebc5a03d4ab77733af0d0f1afbc4a973388f3995694",
+  "severus": "ghcr.io/chusj-pigu/severus@sha256:07ade7f3aec9181b7f5f52cda1d505662fd256516bedb7bdfa1047fe9466dff1",
+  "stellerator": "ghcr.io/chusj-pigu/stellerator@sha256:b464e55a95a55d442cc2c75af381ff2dffeb342760a2f49674c867a6e531ecd8",
+  "qdnaseq": "ghcr.io/chusj-pigu/qdnaseq@sha256:870d6228e7a6fdfb08c3093069be07adb9f26084bcc12cf11a2c24eeb99bd1d9",
+  "delly": "ghcr.io/chusj-pigu/delly@sha256:7009e0aebca9dd703fc0958738cb1fa3d547b7cc05086f7feab6436aa015e831",
+  "subchrom": "ghcr.io/chusj-pigu/subchrom@sha256:ab95d47f012678bf89f9161a548b88fd542907ad52b2524e1bd2198e112c7224",
+  "ichorcna": "ghcr.io/chusj-pigu/ichorcna@sha256:d70be8a59c4eda1d4f7d9adf856ed603419b5d5ea65f8d573c9252165d5db95a"
+}
