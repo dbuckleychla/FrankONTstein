@@ -1,0 +1,44 @@
+name: Validate workflow
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: nf-core/setup-nextflow@v2
+        with:
+          version: '25.10.2'
+      - uses: nf-core/setup-nf-test@v1
+        with:
+          version: '0.9.2'
+      - run: python3 bin/bootstrap.py
+      - run: python3 bin/check_dependencies.py
+      - run: python3 -m pip install pysam==0.23.3
+      - run: python3 -m unittest discover -s tests -v
+      - run: nextflow run tests/plan_checks.nf -lib lib
+      - run: python3 tests/run_contracts.py
+      - run: nf-test test tests/reference.nf.test
+        env:
+          FRANKONTSTEIN_TEST_ROOT: ${{ github.workspace }}
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.8'
+      - run: terraform -chdir=terraform/aws fmt -check
+      - run: terraform -chdir=terraform/aws init -backend=false -input=false
+      - run: terraform -chdir=terraform/aws validate

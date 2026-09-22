@@ -1,0 +1,27 @@
+nextflow_process {
+    name "Validate adaptive-sampling reference coordinates"
+    script "../modules/local/reference/main.nf"
+    process "VALIDATE_REFERENCE"
+
+    test("reference and both required BEDs agree") {
+        when {
+            process {
+                """
+                input[0] = [file(params.test_root + '/tests/fixtures/reference.fa'), file(params.test_root + '/tests/fixtures/reference.fa.fai')]
+                input[1] = file(params.test_root + '/tests/fixtures/regions.bed')
+                input[2] = file(params.test_root + '/tests/fixtures/regions.bed')
+                input[3] = []
+                input[4] = []
+                input[5] = []
+                input[6] = []
+                input[7] = []
+                input[8] = false
+                """
+            }
+        }
+        then {
+            assert process.success
+            assert process.out.reference.size() == 1
+        }
+    }
+}

@@ -1,0 +1,12 @@
+.git
+**/.git
+.nextflow*
+.nf-test
+work
+results
+**/__pycache__
+**/.terraform
+**/*.tfstate*
+**/*.tfvars
+**/*.tfplan
+.env

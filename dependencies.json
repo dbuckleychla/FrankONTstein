@@ -1,0 +1,11 @@
+{
+  "oncoseq": {
+    "url": "https://github.com/chusj-pigu/nf-core-oncoseq.git",
+    "commit": "404cf6cf6584d52f184c857105be5737724a5336",
+    "modules": ["bcftools", "clair3", "clairsto", "classy", "delly", "dorado", "ichorcna", "minimap2", "modkit", "qdnaseq", "samtools", "severus", "sniffles", "stellerator", "subchrom"]
+  },
+  "nasvar": {
+    "url": "https://github.com/jwanglab/nasvar.git",
+    "commit": "f781bfca0216e1bbc354c2600733e3b13638d82c"
+  }
+}

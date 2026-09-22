@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reference bundle",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "genome",
+    "fasta",
+    "fai"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "genome": {
+      "enum": [
+        "hg38",
+        "GRCh38",
+        "hs1",
+        "CHM13",
+        "t2t"
+      ]
+    },
+    "fasta": {
+      "type": "string"
+    },
+    "fai": {
+      "type": "string"
+    },
+    "nasvar": {
+      "type": "object",
+      "required": [
+        "repeats",
+        "sites",
+        "gff",
+        "config",
+        "reference"
+      ],
+      "properties": {
+        "repeats": {
+          "type": "string"
+        },
+        "sites": {
+          "type": "string"
+        },
+        "gff": {
+          "type": "string"
+        },
+        "config": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        }
+      }
+    },
+    "models": {
+      "type": "object"
+    },
+    "callers": {
+      "type": "object"
+    }
+  }
+}

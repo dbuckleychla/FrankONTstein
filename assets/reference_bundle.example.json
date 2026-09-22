@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "hg38-adaptive-v1",
+  "genome": "hg38",
+  "fasta": "/references/hg38/reference.fa",
+  "fai": "/references/hg38/reference.fa.fai",
+  "nasvar": {
+    "repeats": "/references/hg38/repeats.bed",
+    "sites": "/references/hg38/sites.tsv",
+    "gff": "/references/hg38/genes.gff3",
+    "config": "/panels/pipeline.json",
+    "reference": "/references/hg38/reference.json"
+  },
+  "models": {
+    "clair3": "/references/models/clair3/r1041_e82_400bps_sup_v500",
+    "clairsto": "ont_r10_dorado_sup_5khz_ssrs"
+  },
+  "callers": {
+    "fusion_list": "/references/hg38/fusion_targets.tsv",
+    "delly_map": "/references/hg38/delly.mappability.gz",
+    "subchrom_panel": "/references/hg38/adaptive_panel_bins.bed",
+    "ichor_gc": "/references/hg38/gc_hg38_1000kb.wig",
+    "ichor_map": "/references/hg38/map_hg38_1000kb.wig",
+    "ichor_centromeres": "/references/hg38/centromeres.txt",
+    "ichor_panel": "/references/hg38/adaptive_normal_panel.rds",
+    "ichor_seqinfo": "/references/hg38/seqinfo.RData"
+  }
+}

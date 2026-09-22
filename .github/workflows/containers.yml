@@ -1,0 +1,70 @@
+name: Build custom analysis images
+on:
+  workflow_dispatch:
+    inputs:
+      dorado_image:
+        description: Digest-pinned oncoseq Dorado base image
+        required: true
+      rust_image:
+        description: Digest-pinned Rust bookworm builder
+        required: true
+      runtime_image:
+        description: Digest-pinned Debian bookworm-slim runtime
+        required: true
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 bin/bootstrap.py
+      - run: python3 bin/check_dependencies.py
+      - name: Check immutable base inputs
+        env:
+          DORADO: ${{ inputs.dorado_image }}
+          RUST: ${{ inputs.rust_image }}
+          RUNTIME: ${{ inputs.runtime_image }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          for name in ['DORADO','RUST','RUNTIME']:
+              assert re.fullmatch(r'[^\s]+@sha256:[a-f0-9]{64}', os.environ[name]), name
+          PY
+          echo "IMAGE_ROOT=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/preprocess/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_ROOT }}/preprocess:${{ github.sha }}
+          build-args: |
+            DORADO_IMAGE=${{ inputs.dorado_image }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/nasvar/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_ROOT }}/nasvar:${{ github.sha }}
+          build-args: |
+            RUST_IMAGE=${{ inputs.rust_image }}
+            RUNTIME_IMAGE=${{ inputs.runtime_image }}
+      - name: Resolve release candidate image lock
+        run: |
+          python3 bin/lock_images.py \
+            --preprocess "$IMAGE_ROOT/preprocess:$GITHUB_SHA" \
+            --nasvar "$IMAGE_ROOT/nasvar:$GITHUB_SHA" \
+            --output images.lock.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-image-lock
+          path: images.lock.json

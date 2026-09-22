@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "stub-hs1",
+  "genome": "hs1",
+  "fasta": "reference.fa",
+  "fai": "reference.fa.fai",
+  "nasvar": {
+    "repeats": "regions.bed",
+    "gff": "genes.gff3",
+    "sites": "sites.tsv",
+    "config": "config.json",
+    "reference": "config.json"
+  },
+  "models": {
+    "clair3": "config.json",
+    "clairsto": "test_model"
+  },
+  "callers": {
+    "fusion_list": "config.json",
+    "delly_map": "config.json",
+    "subchrom_panel": "config.json",
+    "ichor_gc": "config.json",
+    "ichor_map": "config.json",
+    "ichor_centromeres": "config.json",
+    "ichor_panel": "config.json",
+    "ichor_seqinfo": "config.json"
+  }
+}

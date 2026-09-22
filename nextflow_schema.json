@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FrankONTstein parameters",
+  "type": "object",
+  "properties": {
+    "primary": {
+      "type": "boolean",
+      "default": false
+    },
+    "secondary": {
+      "type": "boolean",
+      "default": false
+    },
+    "tertiary": {
+      "type": "boolean",
+      "default": false
+    },
+    "trim": {
+      "type": "boolean",
+      "default": false
+    },
+    "bam": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "string",
+      "minLength": 1
+    },
+    "demux_samplesheet": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_bundle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targets_bed": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enrichment_bed": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image_manifest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "callers": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequencing_kit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outdir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "genome": {
+      "enum": [
+        "hg38",
+        "GRCh38",
+        "hs1",
+        "CHM13",
+        "t2t"
+      ]
+    },
+    "clair3_gpu": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "reference_bundle",
+    "targets_bed",
+    "enrichment_bed",
+    "image_manifest"
+  ],
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "required": [
+            "bam",
+            "sample_id"
+          ],
+          "not": {
+            "required": [
+              "input"
+            ]
+          }
+        },
+        {
+          "required": [
+            "input"
+          ],
+          "not": {
+            "required": [
+              "bam"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "not": {
+        "required": [
+          "primary",
+          "secondary"
+        ],
+        "properties": {
+          "primary": {
+            "const": true
+          },
+          "secondary": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "primary",
+          "tertiary"
+        ],
+        "properties": {
+          "primary": {
+            "const": true
+          },
+          "tertiary": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "secondary",
+          "tertiary"
+        ],
+        "properties": {
+          "secondary": {
+            "const": true
+          },
+          "tertiary": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}

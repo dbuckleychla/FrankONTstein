@@ -1,0 +1,12 @@
+region = "us-west-2"
+name   = "frankontstein-dev"
+# Standard AWS credentials / AWS_PROFILE are honored; no account is embedded.
+max_vcpus = 64
+spot      = false
+# Optional existing network, with outbound connectivity for images and assets:
+# vpc_id = "vpc-..."
+# subnet_ids = ["subnet-...", "subnet-..."]
+# Optional existing bucket; tasks write only work/ and results/ prefixes:
+# bucket_name = "your-existing-bucket"
+# read_bucket_arns = ["arn:aws:s3:::your-input-bucket"]
+# permissions_boundary_arn = "arn:aws:iam::<account>:policy/<boundary>"

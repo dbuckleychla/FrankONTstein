@@ -1,0 +1,12 @@
+.nextflow*
+work/
+results/
+__pycache__/
+.pytest_cache/
+.terraform/
+*.tfstate*
+*.tfplan
+*.auto.tfvars
+.env
+.nf-test/
+terraform.tfvars

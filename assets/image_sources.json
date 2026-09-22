@@ -1,0 +1,13 @@
+{
+  "classy": "ghcr.io/chusj-pigu/classy-slim:sha-71c699b",
+  "bcftools": "ghcr.io/chusj-pigu/bcftools:latest",
+  "clair3": "ghcr.io/chusj-pigu/clair3:5c1b224addf317c2cfe5ab5e03f6cdb23da13303",
+  "clairsto": "ghcr.io/chusj-pigu/clairsto:e2c2bc3fb56131fcf09237141779d4aed5bd031d",
+  "sniffles": "ghcr.io/chusj-pigu/sniffles:latest",
+  "severus": "ghcr.io/chusj-pigu/severus:a294582458464a429891218e2be1c8c0db07b199",
+  "stellerator": "ghcr.io/chusj-pigu/stellerator:5723fc7c4383bc34f07a9e7c159f9205ce1f8e08",
+  "qdnaseq": "ghcr.io/chusj-pigu/qdnaseq:latest",
+  "delly": "ghcr.io/chusj-pigu/delly:4c07465cd477798fc6fe0b06d941dbe8acdba7bb",
+  "subchrom": "ghcr.io/chusj-pigu/subchrom:c44904fbee8490d0282d5b09956ed531bd57a6e9",
+  "ichorcna": "ghcr.io/chusj-pigu/ichorcna:latest"
+}

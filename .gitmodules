@@ -1,0 +1,6 @@
+[submodule "vendor/oncoseq"]
+	path = vendor/oncoseq
+	url = https://github.com/chusj-pigu/nf-core-oncoseq.git
+[submodule "vendor/nasvar"]
+	path = vendor/nasvar
+	url = https://github.com/jwanglab/nasvar.git
