@@ -111,7 +111,15 @@ be demultiplexable.
 
 Use `-c site.config` for site resource overrides. Processes use CPU execution by default. Do not assign GPUs to Dorado demux/trim/align merely because Dorado also supports GPU basecalling.
 
-Outputs include per-sample `alignment/`, `methylation/` and caller directories; caller-specific JSON/VCF/BCF/plots; `index.html`; `manifest.json`; and `pipeline_info/` with task status, trace, versions and execution reports. NASVAR's native JSON and HTML are preserved. Small-variant VCFs are also restricted to `--targets_bed` and indexed; raw caller VCFs remain available. The workflow does not merge competing callers into consensus calls.
+Alignment, Clair3, ClairS-TO, Sniffles, Severus and Stellerator request 16 CPUs
+and 32 GB by default. Classy requests 8 CPUs/8 GB; NASVAR requests 8 CPUs/32 GB.
+Requests respect `--max_cpus` and `--max_memory`; memory can increase on retry.
+These resource tiers do not change the configured Slurm/AWS queue. NASVAR's CPU
+allocation does not imply that every subcommand uses all eight cores.
+Other processes retain their defaults; bcftools compression threads do not make
+its core variant-calling computation fully parallel.
+
+Outputs include per-sample `alignment/`, `methylation/classy/` and caller directories; caller-specific JSON/VCF/BCF/plots; `index.html`; `manifest.json`; and `pipeline_info/` with task status, trace, versions and execution reports. NASVAR's native JSON and HTML are preserved. Small-variant VCFs are also restricted to `--targets_bed` and indexed; raw caller VCFs remain available. The workflow does not merge competing callers into consensus calls.
 
 QDNAseq, Delly and ichorCNA use reads not overlapping enrichment regions for broad CNV analysis. SubChrom uses its panel mode, your panel bins, and Clair3 output. These supplementary results need assay-specific validation; NASVAR is the primary adaptive-sampling analysis.
 

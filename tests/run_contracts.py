@@ -42,6 +42,12 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
         assert result['run']['stub'] is True
         assert len(result['analyses']) == expected, result['analyses']
         assert all(r['status']=='completed' for r in result['analyses'])
+        for record in result['analyses']:
+            if record['analysis'] == 'methylation':
+                sample = record['sample']
+                assert record['files'] == [f'{sample}/methylation/classy'], record
+                assert (out/sample/'methylation/classy'/f'{sample}_combined_classification.json').is_file()
+                assert not (out/sample/'methylation/methylation').exists()
         if tier=='secondary': assert (out/'demultiplex/run1/demux/unclassified.bam').exists()
         if a.skip_resume_check: continue
         subprocess.run(args+['-resume',result['run']['session_id']],cwd=root,env=env,check=True)
