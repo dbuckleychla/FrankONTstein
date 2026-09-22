@@ -37,9 +37,7 @@
       "required": [
         "repeats",
         "sites",
-        "gff",
-        "config",
-        "reference"
+        "gff"
       ],
       "properties": {
         "repeats": {

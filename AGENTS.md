@@ -12,8 +12,16 @@
 - Preserve MM/ML/MN tags and read groups. Demultiplex before optional trimming;
   never silently process a tag-stripped BAM as methylation-capable.
 - Both `--targets_bed` and `--enrichment_bed` are required in every tier.
+- Resolve relative reference/image-lock paths from projectDir; preserve legacy
+  bundle-relative assets and launch-relative sample inputs.
+- Keep `bam`, `genome`, and `sample_id` on the command line in run examples.
+- Prefer shared top-level run inputs and per-analysis assets under `steps`;
+  retain legacy reference bundles. Auto-select NASVAR reference JSON by genome;
+  auto-select the matching pediatric leukemia pipeline config as well.
 - Separate enrichment BED from target BED and immutable genome assets. Reject
   incompatible explicit callers; report default exclusions. Never mix genome builds.
+- Use standard public hg38 ichorCNA reference files and normal panel when no
+  adaptive-sampling panel is available; record their provenance.
 - Keep each caller's results distinct. Do not generate consensus calls implicitly.
 
 ## Dependencies and extension

@@ -1,5 +1,31 @@
 # Reference bundles
 
+See [public reference sources](reference-sources.md) for a field-by-field download
+inventory, the ichorCNA files already available in the pinned checkout, and assets
+that must be prepared for your panel.
+
+The reusable reference configuration is shown in `assets/references.example.yaml`: shared
+reference inputs at the top level and per-analysis assets in `steps`. Supply
+`--bam`, `--genome`, and `--sample_id` on the command line. The file's reference
+paths must match that genome; changing `--genome` does not replace those paths. A separate bundle is
+optional. For this layout, `fai` defaults to `<fasta>.fai`, and relative paths are
+resolved from the workflow directory containing `main.nf` (`projectDir`). This
+also applies to target/enrichment BEDs, the image lock, and the path to a legacy
+bundle. Assets inside a legacy bundle still resolve relative to that bundle.
+Absolute paths and supported remote asset URLs remain unchanged. BAM and sample
+manifest paths retain their launch-directory semantics. The `-params-file` YAML
+path itself is resolved by Nextflow from the launch directory.
+
+NASVAR reference JSON defaults are selected from the pinned submodule:
+`hg38`/`GRCh38` selects `GRCh38_reference.json`; `hs1`/`CHM13` selects
+`T2T-CHM13v2.0_reference.json`. No download is required after bootstrap.
+The pediatric leukemia pipeline config is also automatic:
+`peds_leukemia_config.GRCh38.json` for hg38, or `peds_leukemia_config.json` for
+CHM13. Repeats, sites and GFF remain explicit assets. Optional
+`steps.nasvar.config` and `steps.nasvar.reference` paths override these defaults.
+Legacy bundles support the same automatic selection when `nasvar.config` or
+`nasvar.reference` is omitted. The following describes that legacy layout.
+
 Start from `assets/reference_bundle.example.json`. Set `schema_version: 1`, a versioned `id`, and `genome` (`hg38` or `hs1`). The selected `--genome`, if supplied, must agree with the bundle. CHM13 v1.1 and v2.0 are not interchangeable assets.
 
 The bundle requires uncompressed FASTA and its FAI. Relative paths resolve against the bundle's location; absolute paths and S3 URLs are also accepted. Each run uses one bundle; run different builds separately. Input/index basenames must match (`reference.fa` / `reference.fa.fai`). The reference-validation process checks FASTA offsets and line widths against its FAI, then checks BED/GFF/site coordinates against contig lengths.
@@ -17,7 +43,7 @@ The target BED and enrichment BED are always CLI inputs, never inferred from eac
 | SubChrom | `callers.subchrom_panel`: prepared panel-bin BED matching the adaptive panel |
 | ichorCNA | `callers.ichor_gc`, `ichor_map`, `ichor_centromeres`, `ichor_panel`, `ichor_seqinfo` |
 
-The supplied NASVAR submodule has separate hg38 and CHM13 reference configurations. Select the matching configuration and review assay-specific gene/threshold settings. Do not reuse the pediatric leukemia example unchanged for unrelated assays.
+The supplied NASVAR submodule has separate hg38 and CHM13 reference configurations. The workflow selects the matching pediatric leukemia configurations automatically; review their genes and thresholds against your panel.
 
 Clair3 models are explicit paths rather than inferred from a `sup`/`hac` substring. ClairS-TO, Sniffles, Severus and Stellerator upstream images have additional internal model/annotation assets: verify these against your bundle during release validation. In particular, verify the CHM13 version of each tool's internal assets. Classy translates `hs1` to its `t2t` identifier and uses its own classifier liftover resources.
 

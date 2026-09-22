@@ -1,0 +1,56 @@
+# Pass --bam, --genome and --sample_id on the CLI.
+# Relative reference paths resolve from the directory containing main.nf.
+# Reference version label.
+reference_id: hg38-v1
+# Genome FASTA; requires a matching .fai index.
+fasta: /home/ec2-user/references/hg38/fasta/hg38.fa
+# Target regions without enrichment padding (BED).
+targets_bed: /home/ec2-user/references/hg38/targets/DARGAN_OCCRA_ALMA_CHLA_wishlist.GENCODE_v50.hg38.bed
+# Regions selected for adaptive sampling (BED).
+enrichment_bed: /home/ec2-user/references/hg38/targets/DARGAN_OCCRA_ALMA_CHLA_wishlist.GENCODE_v50.20000bp-buffer.hg38.bed
+# Container digest lock from GitHub Actions.
+image_manifest: images.lock.json
+# Assets must match --genome; see docs/reference-sources.md.
+steps:
+
+  # Pediatric leukemia configs selected automatically by genome.
+  nasvar:
+    # Repeat regions (BED).
+    repeats: /home/ec2-user/references/hg38/nasvar/repeats.bed
+    # Common SNPs: headerless chrom, position (1-based), REF, ALT TSV.
+    sites: /home/ec2-user/references/hg38/nasvar/maf_sites_all.tsv
+    # GFF3: verify gene Name attributes and NASVAR-config transcript IDs.
+    gff: /home/ec2-user/references/hg38/nasvar/GCF_000001405.40_GRCh38.p14_genomic.gff
+
+  clair3:
+    # Clair3 model directory matching chemistry/basecalling.
+    model: /home/ec2-user/references/rerio/clair3_models/r1041_e82_400bps_sup_v520
+
+  clairsto:
+    # ClairS-TO model identifier (not a path).
+    model: ont_r10_dorado_sup_5khz_ssrs
+
+  stellerator:
+    # Custom fusion loci in Stellerator --loci format.
+    fusion_list: vendor/oncoseq/assets/fusion-list.txt
+
+  delly:
+    # Delly mappability map matching the exact FASTA.
+    map: /home/ec2-user/references/hg38/delly/Homo_sapiens.GRCh38.dna.primary_assembly.fa.r101.s501.blacklist.gz
+
+  subchrom:
+    # Custom enrichment panel bins (BED) generated from subchrom PanelBin.py
+    panel: /home/ec2-user/references/hg38/subchrom/hg38.SubChrom_PanelBin.bed
+
+  # Standard hg38 resources; 1 Mb bins.
+  ichorcna:
+    # GC-content WIG, 1 Mb bins.
+    gc: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/gc_hg38_1000kb.wig
+    # Mappability WIG, 1 Mb bins.
+    map: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/map_hg38_1000kb.wig
+    # Centromere exclusion coordinates.
+    centromeres: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
+    # Standard hg38 low-pass-WGS normal panel (1 Mb, RDS).
+    panel: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/HD_ULP_PoN_hg38_1Mb_median_normAutosome_median.rds
+    # Generated RData containing the seqinfo chromosome metadata object.
+    seqinfo: /home/ec2-user/references/ichorCNA/seqinfo.RData

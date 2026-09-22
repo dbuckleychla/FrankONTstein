@@ -1,0 +1,56 @@
+# Pass --bam, --genome and --sample_id on the CLI.
+# Relative reference paths resolve from the directory containing main.nf.
+# Reference version label.
+reference_id: hg38-v1
+# Genome FASTA; requires a matching .fai index.
+fasta: /references/hg38/reference.fa
+# Target regions without enrichment padding (BED).
+targets_bed: /panels/targets.bed
+# Regions selected for adaptive sampling (BED).
+enrichment_bed: /panels/enrichment.bed
+# Container digest lock from GitHub Actions.
+image_manifest: images.lock.json
+# Assets must match --genome; see docs/reference-sources.md.
+steps:
+
+  # Pediatric leukemia configs selected automatically by genome.
+  nasvar:
+    # Repeat regions (BED).
+    repeats: /references/hg38/repeats.bed
+    # Common SNPs: headerless chrom, position (1-based), REF, ALT TSV.
+    sites: /references/hg38/sites.tsv
+    # Gene/transcript annotation (GFF3).
+    gff: /references/hg38/genes.gff3
+
+  clair3:
+    # Clair3 model directory matching chemistry/basecalling.
+    model: /references/models/clair3
+
+  clairsto:
+    # ClairS-TO model identifier (not a path).
+    model: ont_r10_dorado_sup_5khz_ssrs
+
+  stellerator:
+    # Custom fusion loci in Stellerator --loci format.
+    fusion_list: /references/hg38/fusion_targets.tsv
+
+  delly:
+    # Delly mappability map matching the exact FASTA.
+    map: /references/hg38/delly.mappability.gz
+
+  subchrom:
+    # Custom enrichment panel bins (BED).
+    panel: /references/hg38/panel_bins.bed
+
+  # Standard hg38 resources; 1 Mb bins.
+  ichorcna:
+    # GC-content WIG, 1 Mb bins.
+    gc: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/gc_hg38_1000kb.wig
+    # Mappability WIG, 1 Mb bins.
+    map: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/map_hg38_1000kb.wig
+    # Centromere exclusion coordinates.
+    centromeres: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
+    # Standard hg38 low-pass-WGS normal panel (1 Mb, RDS).
+    panel: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/HD_ULP_PoN_hg38_1Mb_median_normAutosome_median.rds
+    # Generated RData containing the seqinfo chromosome metadata object.
+    seqinfo: /references/hg38/seqinfo.RData

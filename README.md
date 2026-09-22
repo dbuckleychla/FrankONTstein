@@ -33,6 +33,30 @@ Prepare a local image lock and a reference bundle using [the container guide](do
 
 ## Run
 
+For a reusable reference configuration, copy `assets/references.example.yaml` to
+`references.yaml` and
+replace the example paths. Supply `--bam`, `--genome`, and `--sample_id` on the
+command line. Shared reference inputs (`fasta`, `targets_bed`, `enrichment_bed`)
+are top-level parameters in the file; analysis-specific assets live under
+`steps.nasvar`, `steps.clair3`, etc. Launch with:
+
+```bash
+nextflow run . -profile local,docker -params-file references.yaml \
+  --bam /data/sample.ubam --genome hg38 --sample_id sample1 \
+  --secondary --outdir results/sample1
+```
+
+The FASTA index defaults to `<fasta>.fai`; it must already exist. Relative paths
+for references and the image lock resolve from the workflow directory containing
+`main.nf` (`projectDir`), not the launch directory or YAML directory. No separate bundle is
+required. Existing `--reference_bundle` runs remain supported, but cannot be
+combined with `fasta`, `fai`, or `steps` parameters.
+
+NASVAR's reference JSON and pediatric leukemia pipeline config are selected
+by genome build from its pinned source. No preset option or separate JSON
+download is needed. Use `steps.nasvar.config` or `steps.nasvar.reference` only
+when overriding those defaults for your panel or reference.
+
 Both BED inputs are **required in every tier**:
 
 - `--enrichment_bed`: regions used for adaptive-sampling enrichment.
@@ -86,7 +110,9 @@ QDNAseq, Delly and ichorCNA use reads not overlapping enrichment regions for bro
 Resume with the same inputs, image lock, working directory and `.nextflow/` state:
 
 ```bash
-nextflow run . -resume -profile local,docker -params-file run.json
+nextflow run . -resume -profile local,docker -params-file references.yaml \
+  --bam /data/sample.ubam --genome hg38 --sample_id sample1 \
+  --secondary --outdir results/sample1
 ```
 
 Keep distinct output directories for unrelated runs. Retain task work files until you no longer need resume. `pipeline_info/status.json` is the authoritative run-level completion status; a failed run may still have completed sample artifacts.

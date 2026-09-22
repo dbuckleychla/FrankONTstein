@@ -1,6 +1,31 @@
 import groovy.json.JsonSlurper
 
 class WorkflowPlan {
+    static Map reference(Map p, Map legacy, String projectDir) {
+        if (legacy && (p.fasta || p.fai || p.steps))
+            throw new IllegalArgumentException('Use reference_bundle or shared fasta/fai/steps, not both')
+        def b = legacy ? new LinkedHashMap(legacy) : [schema_version:1,
+            id:p.reference_id ?: "${genome(p.genome)}-local", genome:genome(p.genome),
+            fasta:p.fasta, fai:p.fai ?: (p.fasta ? "${p.fasta}.fai" : null)]
+        if (!b.fasta || !b.fai) throw new IllegalArgumentException('Reference requires fasta and fai')
+        def steps = p.steps ?: [:]
+        b.nasvar = new LinkedHashMap(legacy ? (legacy.nasvar ?: [:]) : (steps.nasvar ?: [:]))
+        if (!legacy) {
+            b.models = [clair3:steps.clair3?.model, clairsto:steps.clairsto?.model]
+            b.callers = [fusion_list:steps.stellerator?.fusion_list, delly_map:steps.delly?.map,
+                subchrom_panel:steps.subchrom?.panel]
+            ['gc','map','centromeres','panel','seqinfo'].each { key ->
+                b.callers["ichor_${key}"] = steps.ichorcna?.get(key)
+            }
+        }
+        def build = genome(b.genome)
+        def dir = "${projectDir}/vendor/nasvar/config"
+        if (!b.nasvar.reference) b.nasvar.reference = "${dir}/${build == 'hg38' ? 'GRCh38_reference.json' : 'T2T-CHM13v2.0_reference.json'}"
+        if (!b.nasvar.config)
+            b.nasvar.config = "${dir}/${build == 'hg38' ? 'peds_leukemia_config.GRCh38.json' : 'peds_leukemia_config.json'}"
+
+        b
+    }
     static final List CALLERS = ['nasvar','bcftools','clair3','clairsto','sniffles','severus','stellerator','qdnaseq','delly','subchrom','ichorcna']
     static String genome(Object value) {
         def aliases = ['hg38':'hg38', 'grch38':'hg38', 'hs1':'hs1', 'chm13':'hs1', 't2t':'hs1']

@@ -7,7 +7,8 @@ workflow {
     if (params.help) {
         log.info '''FrankONTstein: ONT tumor-only adaptive sampling
 Required: --bam FILE --sample_id ID OR --input manifest.csv
-          --reference_bundle bundle.json --targets_bed targets.bed
+          --genome hg38 --fasta reference.fa (or --reference_bundle bundle.json)
+          --targets_bed targets.bed
           --enrichment_bed enrichment.bed --image_manifest images.json
 Tier:     --primary (default), --secondary, or --tertiary
 Optional: --demux_samplesheet demux.csv --trim --callers nasvar,sniffles
@@ -15,14 +16,18 @@ Profiles: -profile local,docker | slurm,apptainer | aws
 '''
     } else {
         if ((!params.bam && !params.input) || (params.bam && params.input)) error 'Choose --bam or --input'
-        for (required in ['reference_bundle','targets_bed','enrichment_bed','image_manifest']) {
+        for (required in ['targets_bed','enrichment_bed','image_manifest']) {
             if (!params[required]) error "Missing required --${required}"
         }
-        def bundlePath = file(params.reference_bundle, checkIfExists:true)
-        def bundle = WorkflowPlan.readJson(bundlePath)
+        def projectPath = { value ->
+            def s = value.toString()
+            file(s.contains('://') || s.startsWith('/') ? s : projectDir.resolve(s).toString(), checkIfExists:true)
+        }
+        def bundlePath = params.reference_bundle ? projectPath(params.reference_bundle) : null
+        def bundle = WorkflowPlan.reference(params as Map, bundlePath ? WorkflowPlan.readJson(bundlePath) : [:], projectDir.toString())
         if (params.sequencing_kit) WorkflowPlan.identifier(params.sequencing_kit.toString())
         def plan = WorkflowPlan.resolve(params as Map, bundle)
-        def imageLock = WorkflowPlan.readJson(file(params.image_manifest, checkIfExists:true))
+        def imageLock = WorkflowPlan.readJson(projectPath(params.image_manifest))
         def neededImages = (['preprocess','classy'] + plan.callers).unique()
         if (plan.callers.intersect(['clair3','clairsto']) && !neededImages.contains('bcftools')) neededImages += 'bcftools'
         neededImages.each { name ->
@@ -31,13 +36,13 @@ Profiles: -profile local,docker | slurm,apptainer | aws
         def assetPath = { value ->
             if (!value) error 'Missing selected analysis reference asset'
             def s = value.toString()
-            def resolved = s.contains('://') || s.startsWith('/') ? s : bundlePath.parent.resolve(s).toString()
+            def resolved = s.contains('://') || s.startsWith('/') ? s : (bundlePath ? bundlePath.parent.resolve(s).toString() : projectDir.resolve(s).toString())
             file(resolved, checkIfExists:true)
         }
         def fasta = assetPath(bundle.fasta)
         def fai = assetPath(bundle.fai)
         if (fai.name != fasta.name + '.fai') error 'FASTA index basename must be FASTA basename + .fai'
-        def assets = [enrichment:file(params.enrichment_bed, checkIfExists:true), targets:file(params.targets_bed, checkIfExists:true)]
+        def assets = [enrichment:projectPath(params.enrichment_bed), targets:projectPath(params.targets_bed)]
         ['repeats','gff','sites','config','reference'].each { name ->
             assets[name] = plan.callers.contains('nasvar') ? assetPath(bundle.nasvar?.get(name)) : []
         }

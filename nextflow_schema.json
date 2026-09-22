@@ -75,10 +75,22 @@
     "clair3_gpu": {
       "type": "boolean",
       "default": false
+    },
+    "fasta": {
+      "type": "string"
+    },
+    "fai": {
+      "type": "string"
+    },
+    "reference_id": {
+      "type": "string"
+    },
+    "steps": {
+      "type": "object",
+      "description": "Per-analysis assets: nasvar, clair3, clairsto, stellerator, delly, subchrom, ichorcna"
     }
   },
   "required": [
-    "reference_bundle",
     "targets_bed",
     "enrichment_bed",
     "image_manifest"
@@ -156,6 +168,45 @@
           }
         }
       }
+    },
+    {
+      "oneOf": [
+        {
+          "required": [
+            "reference_bundle"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "fasta"
+                ]
+              },
+              {
+                "required": [
+                  "fai"
+                ]
+              },
+              {
+                "required": [
+                  "steps"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "genome",
+            "fasta"
+          ],
+          "not": {
+            "required": [
+              "reference_bundle"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

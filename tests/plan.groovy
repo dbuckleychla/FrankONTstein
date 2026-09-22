@@ -38,3 +38,15 @@ assert summary.find { it.analysis == 'alignment' }.status == 'completed'
 assert summary.find { it.analysis == 'nasvar' }.status == 'failed'
 assert summary.find { it.analysis == 'methylation' }.status == 'not_completed'
 println '3 failed-run reporting assertions passed'
+def shared = [genome:'GRCh38', fasta:'/ref/hg38.fa', steps:[nasvar:[:]]]
+def normalized = planner.reference(shared, [:], '/project')
+assert normalized.fai == '/ref/hg38.fa.fai'
+assert normalized.nasvar.reference.endsWith('/GRCh38_reference.json')
+assert normalized.nasvar.config.endsWith('/peds_leukemia_config.GRCh38.json')
+def chm = planner.reference(shared + [genome:'CHM13'], [:], '/project')
+assert chm.nasvar.reference.endsWith('/T2T-CHM13v2.0_reference.json')
+assert chm.nasvar.config.endsWith('/peds_leukemia_config.json')
+assert planner.reference([genome:'hg38',fasta:'ref.fa'],[:],'/project').nasvar.config.endsWith('/peds_leukemia_config.GRCh38.json')
+rejects { planner.reference(shared, hg38 + [fasta:'ref.fa',fai:'ref.fa.fai'], '/project') }
+assert planner.reference(shared + [steps:[nasvar:[config:'custom.json']]], [:], '/project').nasvar.config == 'custom.json'
+println '8 shared-input and NASVAR default assertions passed'

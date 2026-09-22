@@ -29,6 +29,14 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
         ('tertiary',['--bam','tests/fixtures/stub.bam','--sample_id','sample1'],13)]:
         out=scratch/tier
         args=base+['--'+tier,'--outdir',str(out),'-work-dir',str(scratch/'work'),*extra]
+        if tier == 'primary':
+            # Exercise the shared-input API; other tiers retain legacy-bundle coverage.
+            index = args.index('--reference_bundle')
+            del args[index:index+2]
+            bundle = json.loads((root/'tests/fixtures/bundle.json').read_text())
+            fixture = root/'tests/fixtures'
+            args += ['--genome', bundle['genome'], '--fasta', str(fixture/bundle['fasta']),
+                     '--fai', str(fixture/bundle['fai'])]
         subprocess.run(args,cwd=root,env=env,check=True)
         result=json.loads((out/'manifest.json').read_text())
         assert result['run']['stub'] is True
