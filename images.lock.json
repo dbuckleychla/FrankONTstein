@@ -1,6 +1,6 @@
 {
-  "preprocess": "ghcr.io/dbuckleychla/frankontstein@sha256:d4015def219706d270a278859f0be561e840569b8dbcd5c046df4319be522e07",
-  "nasvar": "ghcr.io/dbuckleychla/frankontstein@sha256:4f2a409705a981cd43b007db1f67d4e6d860e373984273731f714a6eb54145db",
+  "preprocess": "ghcr.io/dbuckleychla/frankontstein@sha256:10f28b527e3c1b4537b33219a0acd30c7a47e9fbb10da3f9ff640c1b5616bb9d",
+  "nasvar": "ghcr.io/dbuckleychla/frankontstein@sha256:bab84979a3777ff7b38cad540374913951c5c0f3f998dfd28b5999270eee282e",
   "classy": "ghcr.io/chusj-pigu/classy-slim@sha256:7ec5fc1e4607be13d30dc65a1b07f2844f8289edbec0ca67a70e9b88ef8beb4c",
   "bcftools": "ghcr.io/chusj-pigu/bcftools@sha256:fe6207fca0e32886ea4161b7b55d0927947658f911b2dccc7e2b590ca7483b48",
   "clair3": "ghcr.io/chusj-pigu/clair3@sha256:e02a63cb7eef4c69291f13adab59f5203a3cf68511572db66f962d381084efed",
