@@ -2,7 +2,7 @@ process NASVAR {
     tag "${meta.id}:${tier}"
     label 'high_memory'
     container { params.images.nasvar }
-    publishDir "${params.outdir}/${meta.id}/variants", mode:'copy'
+    publishDir { "${params.outdir}/${meta.id}/variants" }, mode:'copy'
     input:
     tuple val(meta), path(bam, stageAs:'sample.bam'), path(bai, stageAs:'sample.bam.bai')
     tuple path(fasta, stageAs:'reference.fa'), path(fai, stageAs:'reference.fa.fai'), val(validated)

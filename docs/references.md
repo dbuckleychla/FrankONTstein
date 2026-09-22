@@ -30,7 +30,11 @@ Start from `assets/reference_bundle.example.json`. Set `schema_version: 1`, a ve
 
 The bundle requires uncompressed FASTA and its FAI. Relative paths resolve against the bundle's location; absolute paths and S3 URLs are also accepted. Each run uses one bundle; run different builds separately. Input/index basenames must match (`reference.fa` / `reference.fa.fai`). The reference-validation process checks FASTA offsets and line widths against its FAI, then checks BED/GFF/site coordinates against contig lengths.
 
-The target BED and enrichment BED are always CLI inputs, never inferred from each other or from a genome bundle. BED coordinates are zero-based half-open. GFF3 and NASVAR site coordinates are one-based. Headers in the sites TSV are not supported. Contig names must agree exactly; the workflow does not silently rename or lift over caller inputs.
+The target BED and enrichment BED are always CLI inputs, never inferred from each other or from a genome bundle. BED coordinates are zero-based half-open. GFF3 and NASVAR site coordinates are one-based. Headers in the sites TSV are not supported. The FASTA index must contain chr1–chr22, chrX and chrY. Coordinate checks cover
+shared contigs; annotation-only contigs are reported and skipped during validation
+without modifying the input. Each asset must have at least one matching record.
+Primary chromosome aliases (such as NC_000001.11 versus chr1) still need explicit
+normalization; this check does not rename or lift over caller inputs.
 
 | Analysis | Bundle assets |
 | --- | --- |

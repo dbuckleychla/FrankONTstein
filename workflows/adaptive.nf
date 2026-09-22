@@ -32,7 +32,7 @@ workflow ADAPTIVE {
     } else {
         reads = PREPARE_BAM.out.bam
     }
-    if (params.trim) {
+    if (params.trim.toString().toBoolean()) {
         TRIM_BAM(reads)
         versions = versions.mix(TRIM_BAM.out.versions)
         reads = TRIM_BAM.out.bam
@@ -66,7 +66,7 @@ workflow ADAPTIVE {
         def grouped = rows.groupBy { [it.sample, it.analysis] }.collect { key, items ->
             [sample:key[0], analysis:key[1], status:'completed', files:items.collectMany { it.files }.unique().sort()]
         }
-        def ids = rows*.sample.unique()
+        def ids = rows.collect { it.sample }.unique()
         grouped.sort { a,b -> (a.sample + a.analysis) <=> (b.sample + b.analysis) } + ids.sort().collectMany { id -> plan.skipped.collect { item -> [sample:id, analysis:item.caller, status:'skipped', reason:item.reason, files:[]] } }
     }
     RESULTS_INDEX(completeRecords, provenance, SOFTWARE_VERSIONS.out)

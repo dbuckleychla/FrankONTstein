@@ -1,10 +1,18 @@
-nextflow.enable.dsl=2
 include { ADAPTIVE } from './workflows/adaptive'
 
-def runState = [samples:[], provenance:[:], completed:Collections.synchronizedList([]), failureTask:null, error:null]
-
 workflow {
-    if (params.help) {
+    def runState = [samples:[], provenance:[:], completed:Collections.synchronizedList([]), failureTask:null, error:null]
+    def workflowMeta = workflow
+    def outputDir = file(params.outdir)
+    def showHelp = params.help.toString().toBoolean()
+    workflow.onComplete {
+        if (!showHelp) RunStatus.finish(workflowMeta, runState, outputDir)
+    }
+    workflow.onError { fault ->
+        runState.error = workflowMeta.errorReport ?: workflowMeta.errorMessage ?: fault?.toString()
+    }
+
+    if (showHelp) {
         log.info '''FrankONTstein: ONT tumor-only adaptive sampling
 Required: --bam FILE --sample_id ID OR --input manifest.csv
           --genome hg38 --fasta reference.fa (or --reference_bundle bundle.json)
@@ -16,18 +24,18 @@ Profiles: -profile local,docker | slurm,apptainer | aws
 '''
     } else {
         if ((!params.bam && !params.input) || (params.bam && params.input)) error 'Choose --bam or --input'
-        for (required in ['targets_bed','enrichment_bed','image_manifest']) {
+        ['targets_bed','enrichment_bed','image_manifest'].each { required ->
             if (!params[required]) error "Missing required --${required}"
         }
         def projectPath = { value ->
             def s = value.toString()
             file(s.contains('://') || s.startsWith('/') ? s : projectDir.resolve(s).toString(), checkIfExists:true)
         }
-        def bundlePath = params.reference_bundle ? projectPath(params.reference_bundle) : null
+        def bundlePath = params.reference_bundle ? projectPath.call(params.reference_bundle) : null
         def bundle = WorkflowPlan.reference(params as Map, bundlePath ? WorkflowPlan.readJson(bundlePath) : [:], projectDir.toString())
         if (params.sequencing_kit) WorkflowPlan.identifier(params.sequencing_kit.toString())
         def plan = WorkflowPlan.resolve(params as Map, bundle)
-        def imageLock = WorkflowPlan.readJson(projectPath(params.image_manifest))
+        def imageLock = WorkflowPlan.readJson(projectPath.call(params.image_manifest))
         def neededImages = (['preprocess','classy'] + plan.callers).unique()
         if (plan.callers.intersect(['clair3','clairsto']) && !neededImages.contains('bcftools')) neededImages += 'bcftools'
         neededImages.each { name ->
@@ -39,26 +47,26 @@ Profiles: -profile local,docker | slurm,apptainer | aws
             def resolved = s.contains('://') || s.startsWith('/') ? s : (bundlePath ? bundlePath.parent.resolve(s).toString() : projectDir.resolve(s).toString())
             file(resolved, checkIfExists:true)
         }
-        def fasta = assetPath(bundle.fasta)
-        def fai = assetPath(bundle.fai)
+        def fasta = assetPath.call(bundle.fasta)
+        def fai = assetPath.call(bundle.fai)
         if (fai.name != fasta.name + '.fai') error 'FASTA index basename must be FASTA basename + .fai'
-        def assets = [enrichment:projectPath(params.enrichment_bed), targets:projectPath(params.targets_bed)]
+        def assets = [enrichment:projectPath.call(params.enrichment_bed), targets:projectPath.call(params.targets_bed)]
         ['repeats','gff','sites','config','reference'].each { name ->
-            assets[name] = plan.callers.contains('nasvar') ? assetPath(bundle.nasvar?.get(name)) : []
+            assets[name] = plan.callers.contains('nasvar') ? assetPath.call(bundle.nasvar?.get(name)) : []
         }
         def resources = [:]
-        if (plan.callers.contains('clair3')) resources.clair3_model = assetPath(bundle.models?.clair3)
+        if (plan.callers.contains('clair3')) resources.clair3_model = assetPath.call(bundle.models?.clair3)
         if (plan.callers.contains('clairsto')) {
             resources.clairsto_model = bundle.models?.clairsto
             WorkflowPlan.identifier(resources.clairsto_model as String)
         }
         ['stellerator':'fusion_list', 'delly':'delly_map', 'subchrom':'subchrom_panel'].each { caller,key ->
-            if (plan.callers.contains(caller)) resources[key] = assetPath(bundle.callers?.get(key))
+            if (plan.callers.contains(caller)) resources[key] = assetPath.call(bundle.callers?.get(key))
         }
         if (plan.callers.contains('ichorcna')) {
-            ['ichor_gc','ichor_map','ichor_centromeres','ichor_panel','ichor_seqinfo'].each { key -> resources[key] = assetPath(bundle.callers?.get(key)) }
+            ['ichor_gc','ichor_map','ichor_centromeres','ichor_panel','ichor_seqinfo'].each { key -> resources[key] = assetPath.call(bundle.callers?.get(key)) }
         }
-        if (params.clair3_gpu && workflow.profile.tokenize(',').contains('aws') && !params.aws_gpu_queue) error '--clair3_gpu on AWS requires --aws_gpu_queue'
+        if (params.clair3_gpu.toString().toBoolean() && workflow.profile.tokenize(',').contains('aws') && !params.aws_gpu_queue) error '--clair3_gpu on AWS requires --aws_gpu_queue'
         if (workflow.profile.tokenize(',').contains('aws') && (!params.aws_queue || !params.aws_region || !params.aws_job_role || !workflow.workDir.toString().startsWith('s3://'))) {
             error 'AWS requires --aws_queue, --aws_region, --aws_job_role and -work-dir s3://...'
         }
@@ -68,7 +76,7 @@ Profiles: -profile local,docker | slurm,apptainer | aws
             def rows = left.rows
             def mapping = right.mapping
             def grouped = WorkflowPlan.samples(rows, mapping, params.demux_samplesheet != null, params.sequencing_kit as String)
-            runState.samples = params.demux_samplesheet ? mapping*.sample.unique() : rows*.sample.unique()
+            runState.samples = params.demux_samplesheet ? mapping.collect { it.sample }.unique() : rows.collect { it.sample }.unique()
             grouped.collect { meta, paths -> tuple(meta, paths.collect { file(it, checkIfExists:true) }) }
         }
 
@@ -78,34 +86,4 @@ Profiles: -profile local,docker | slurm,apptainer | aws
         runState.provenance = provenance
         ADAPTIVE(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
     }
-}
-
-workflow.onComplete {
-    if (params.help) return
-    def info = file("${params.outdir}/pipeline_info")
-    info.mkdirs()
-    if (!workflow.success) {
-        // Metadata errorMessage may be empty when a task fails before stderr exists.
-        def taskFault = nextflow.Global.session.fault
-        runState.failureTask = taskFault?.task?.name ?: runState.failureTask
-        runState.error = taskFault?.error?.message ?: runState.error
-        def summaryTrace = 'name\tstatus\n' + runState.completed.collect { item -> "PUBLISH_ARTIFACT (${item.sample}:${item.analysis})\tCOMPLETED\n" }.join('')
-        if (runState.failureTask) summaryTrace += "${runState.failureTask}\tFAILED\n"
-        def analyses = RunStatus.summarize(runState.samples, runState.provenance.plan?.callers ?: [], summaryTrace)
-        file("${params.outdir}/manifest.json").text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
-            run:runState.provenance, status:'failed', error:runState.error ?: workflow.errorMessage, analyses:analyses,
-            task_statuses:'pipeline_info/trace.tsv'
-        ]))
-        file("${params.outdir}/index.html").text = '<!doctype html><meta charset="utf-8"><title>FrankONTstein failed run</title><h1>Run failed</h1><p>See <a href="manifest.json">manifest.json</a> for analysis statuses and <a href="pipeline_info/trace.tsv">trace.tsv</a> for task details. Completed artifacts may be present.</p>'
-    }
-    info.resolve('status.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
-        status:workflow.success ? 'completed' : 'failed', exit_status:workflow.exitStatus,
-        error:runState.error ?: workflow.errorMessage, completed:workflow.complete?.toString(), run:workflow.runName
-    ]))
-}
-
-workflow.onError { fault ->
-    runState.error = workflow.errorReport ?: workflow.errorMessage ?: fault?.toString()
-    if (fault?.hasProperty('task')) runState.failureTask = fault.task?.name
-    else if (fault?.hasProperty('name')) runState.failureTask = fault.name
 }

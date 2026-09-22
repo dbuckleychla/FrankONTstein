@@ -34,6 +34,10 @@ class WorkflowPlan {
         result
     }
     static Map resolve(Map p, Map bundle) {
+        p = new LinkedHashMap(p)
+        ['primary','secondary','tertiary'].each { key ->
+            if (p[key] instanceof String && p[key] in ['true','false']) p[key] = p[key].toBoolean()
+        }
         ['primary','secondary','tertiary'].each { key ->
             if (p[key] != null && !(p[key] instanceof Boolean)) throw new IllegalArgumentException("${key} must be boolean")
         }

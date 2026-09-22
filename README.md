@@ -18,7 +18,11 @@ Both **hg38/GRCh38** and **hs1/CHM13** are supported reference choices. CHM13 de
 
 ## Setup
 
-Requirements: Nextflow 25.10.2 (tested), Java 17–25 supported by your Nextflow release, Python 3.10+, and Docker (local) or Apptainer (Slurm). Analysis images initially target Linux x86-64. An Apple Silicon host can run orchestration tests, but is not a validated production analysis platform.
+The workflow uses syntax compatible with Nextflow's strict v2 parser, the default
+in Nextflow 26. CI targets 25.10.2 (with `NXF_SYNTAX_PARSER=v2`) and 26.04.6.
+The pinned upstream modules are imported without modifying their checkouts.
+
+Requirements: Nextflow 26.04.6 (tested; 25.10.2 with the strict parser also supported), Java 17–25 supported by your Nextflow release, Python 3.10+, and Docker (local) or Apptainer (Slurm). Analysis images initially target Linux x86-64. An Apple Silicon host can run orchestration tests, but is not a validated production analysis platform.
 
 ```bash
 git clone https://github.com/dbuckleychla/FrankONTstein.git

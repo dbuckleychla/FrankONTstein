@@ -1,7 +1,7 @@
 process PUBLISH_ARTIFACT {
     tag "${meta.id}:${analysis}"
     container { params.images.preprocess }
-    publishDir "${params.outdir}/${meta.id}/${analysis}", mode: 'copy', pattern: 'artifacts/*', saveAs: { name -> name.replaceFirst('artifacts/', '') }
+    publishDir { "${params.outdir}/${meta.id}/${analysis}" }, mode: 'copy', pattern: 'artifacts/*', saveAs: { name -> name.replaceFirst('artifacts/', '') }
     input:
     tuple val(meta), val(analysis), path(files, stageAs:'source/*')
     output:

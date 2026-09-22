@@ -50,3 +50,7 @@ assert planner.reference([genome:'hg38',fasta:'ref.fa'],[:],'/project').nasvar.c
 rejects { planner.reference(shared, hg38 + [fasta:'ref.fa',fai:'ref.fa.fai'], '/project') }
 assert planner.reference(shared + [steps:[nasvar:[config:'custom.json']]], [:], '/project').nasvar.config == 'custom.json'
 println '8 shared-input and NASVAR default assertions passed'
+assert planner.resolve([primary:'false',secondary:'true'],hg38).tier == 'secondary'
+assert planner.resolve([primary:'false',secondary:'false',tertiary:'true'],hg38).tier == 'tertiary'
+rejects { planner.resolve([primary:'yes'],hg38) }
+println '3 strict-parser CLI boolean assertions passed'

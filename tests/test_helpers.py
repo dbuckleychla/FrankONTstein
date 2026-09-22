@@ -20,6 +20,24 @@ nasvar = load('run_nasvar')
 report = load('make_report')
 
 class ReferenceTests(unittest.TestCase):
+    def test_primary_contigs_required(self):
+        lengths = dict.fromkeys(reference.PRIMARY_CONTIGS, 100)
+        reference.primary_contigs(lengths)
+        del lengths['chrY']
+        with self.assertRaisesRegex(ValueError, 'chrY'):
+            reference.primary_contigs(lengths)
+
+    def test_extra_annotation_contigs_allowed(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'test.bed'
+            text = 'chr1\t0\t10\nchrUn_extra\t0\t20\n'
+            path.write_text(text)
+            reference.coordinates(path, {'chr1': 10})
+            self.assertEqual(path.read_text(), text)
+            path.write_text('chr1\t0\t11\nchrUn_extra\t0\t20\n')
+            with self.assertRaises(ValueError):
+                reference.coordinates(path, {'chr1': 10})
+
     def test_coordinates_and_mismatches(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / 'test.bed'

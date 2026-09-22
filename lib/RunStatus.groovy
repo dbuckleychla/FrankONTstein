@@ -1,4 +1,27 @@
 class RunStatus {
+    static void finish(workflow, Map runState, outputDir) {
+        def info = outputDir.resolve('pipeline_info')
+        info.mkdirs()
+        if (!workflow.success) {
+            // Metadata errorMessage may be empty when a task fails before stderr exists.
+            def taskFault = nextflow.Global.session.fault
+            runState.failureTask = taskFault?.task?.name ?: runState.failureTask
+            runState.error = taskFault?.error?.message ?: runState.error
+            def summaryTrace = 'name\tstatus\n' + runState.completed.collect { item -> "PUBLISH_ARTIFACT (${item.sample}:${item.analysis})\tCOMPLETED\n" }.join('')
+            if (runState.failureTask) summaryTrace += "${runState.failureTask}\tFAILED\n"
+            def analyses = RunStatus.summarize(runState.samples, runState.provenance.plan?.callers ?: [], summaryTrace)
+            outputDir.resolve('manifest.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+                run:runState.provenance, status:'failed', error:runState.error ?: workflow.errorMessage, analyses:analyses,
+                task_statuses:'pipeline_info/trace.tsv'
+            ]))
+            outputDir.resolve('index.html').text = '<!doctype html><meta charset="utf-8"><title>FrankONTstein failed run</title><h1>Run failed</h1><p>See <a href="manifest.json">manifest.json</a> for analysis statuses and <a href="pipeline_info/trace.tsv">trace.tsv</a> for task details. Completed artifacts may be present.</p>'
+        }
+        info.resolve('status.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+            status:workflow.success ? 'completed' : 'failed', exit_status:workflow.exitStatus,
+            error:runState.error ?: workflow.errorMessage, completed:workflow.complete?.toString(), run:workflow.runName
+        ]))
+    }
+
     static List summarize(List samples, List callers, String trace) {
         def aliases = [ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
             CLAIRS_TO_CALL:'clairsto', BCFTOOLS_MPILEUP:'bcftools', BCFTOOLS_CALL:'bcftools',

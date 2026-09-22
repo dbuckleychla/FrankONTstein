@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """Check staged BED/GFF/site coordinates against the exact reference index."""
 import argparse
+import sys
+from collections import Counter
 from pathlib import Path
+
+PRIMARY_CONTIGS = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY']
+
+
+def primary_contigs(lengths):
+    missing = [name for name in PRIMARY_CONTIGS if name not in lengths]
+    if missing:
+        raise ValueError('FASTA index missing required primary contigs: ' + ', '.join(missing))
 
 
 def contigs(fai):
@@ -48,6 +58,7 @@ def fasta_index(fasta, fai):
 
 def coordinates(path, lengths, kind='bed'):
     count = 0
+    skipped = Counter()
     with open(path) as handle:
         for number, line in enumerate(handle, 1):
             if not line.strip() or line.startswith(('#', 'track ', 'browser ')):
@@ -59,11 +70,21 @@ def coordinates(path, lengths, kind='bed'):
                 start, end = int(f[1]) - 1, int(f[1])
             else:
                 start, end = int(f[1]), int(f[2])
-            if f[0] not in lengths or not 0 <= start < end <= lengths[f[0]]:
+            if not 0 <= start < end:
+                raise ValueError(f'{path}:{number}: coordinate/contig incompatible with FASTA')
+            if f[0] not in lengths:
+                skipped[f[0]] += 1
+                continue
+            if end > lengths[f[0]]:
                 raise ValueError(f'{path}:{number}: coordinate/contig incompatible with FASTA')
             count += 1
+    if skipped:
+        names = ', '.join(sorted(skipped)[:10])
+        if len(skipped) > 10: names += ', ...'
+        print(f'{path}: skipped coordinate validation for {sum(skipped.values())} records '
+              f'on {len(skipped)} contigs absent from FASTA ({names}); file unchanged', file=sys.stderr)
     if count == 0:
-        raise ValueError(f'{path}: empty coordinate asset')
+        raise ValueError(f'{path}: no coordinate records overlap FASTA contigs')
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
@@ -74,6 +95,7 @@ if __name__ == '__main__':
     p.add_argument('--sites')
     args = p.parse_args()
     lengths = contigs(args.fai)
+    primary_contigs(lengths)
     if args.fasta: fasta_index(args.fasta, args.fai)
     for bed in args.bed:
         coordinates(bed, lengths)

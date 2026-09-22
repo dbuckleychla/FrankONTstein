@@ -36,7 +36,7 @@ process CLAIR3 {
     """
     run_clair3.sh --threads=${task.cpus} --sample_name='${meta.id}' \
       --platform=ont --model_path='${model}' --bam_fn='${bam}' --ref_fn='${fasta}' \
-      --bed_fn='${assets}/enrichment.bed' --output=clair3 ${params.clair3_gpu ? '--use_gpu' : ''}
+      --bed_fn='${assets}/enrichment.bed' --output=clair3 ${params.clair3_gpu.toString().toBoolean() ? '--use_gpu' : ''}
     run_clair3.sh --version > versions.yml 2>&1
     """
     stub:

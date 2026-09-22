@@ -2,6 +2,20 @@
 
 ## Automated checks
 
+### Nextflow 26 migration (2026-09-22)
+
+Validated using Nextflow 26.04.6 from the local conda environment with its default
+strict parser: all three tier routing contracts and their `-resume` cache checks
+passed. Injected NASVAR exit 42 propagated and produced the expected failed
+analysis manifest. Local/Docker, Slurm/Apptainer, and AWS configuration profiles
+loaded successfully. All 14 Python tests and 34 Groovy assertions passed.
+The pinned upstream module checkouts were unchanged. CI now targets both
+25.10.2 with parser v2 and 26.04.6.
+
+These are stub/mock routing and configuration checks, not real biological or
+remote-backend execution. Native 26.04.6 resume passed; the older cache limitation
+recorded below concerned the earlier 25.10.2 Java-jar test environment.
+
 - `tests/plan.groovy`: tier selection, prerequisites, aliases, incompatibilities and identifiers.
 - Python unit tests: coordinates, samplesheets, NASVAR error detection/section preservation, and report escaping.
 - `tests/test_modbam.py`: real small BAM records created with pysam; checks reverse-strand alignment, lost tags, changed probabilities, unknown reads and stale trim coordinates.

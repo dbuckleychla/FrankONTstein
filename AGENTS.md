@@ -36,6 +36,8 @@
   tests together. Never modify the user's external source checkouts.
 
 ## Validation and release
+- Use strict Nextflow v2 syntax; test Nextflow 26 and keep vendor gitlinks unchanged.
+  Keep callback helpers in lib/ and use explicit closures for dynamic publish paths.
 - Test tier/caller resolution, sample identity, reference compatibility, tag integrity,
   empty calls, failures, and resume. Run affected Python/nf-test tests and small
   real-data integration tests; stubs alone do not establish scientific correctness.

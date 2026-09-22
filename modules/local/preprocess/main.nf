@@ -2,7 +2,7 @@ process PREPARE_BAM {
     tag "${meta.id}"
     label 'high_memory'
     container { params.images.preprocess }
-    publishDir "${params.outdir}/${meta.id}/preprocessing", mode: 'copy', pattern: '*.json'
+    publishDir { "${params.outdir}/${meta.id}/preprocessing" }, mode: 'copy', pattern: '*.json'
     input:
     tuple val(meta), path(bams, stageAs: 'chunks/input??.bam')
     output:
@@ -28,7 +28,7 @@ process PREPARE_BAM {
 process DEMULTIPLEX {
     tag "${meta.id}"
     container { params.images.preprocess }
-    publishDir "${params.outdir}/demultiplex/${meta.id}", mode: 'copy', pattern: 'demux/*'
+    publishDir { "${params.outdir}/demultiplex/${meta.id}" }, mode: 'copy', pattern: 'demux/*'
     input:
     tuple val(meta), path(bam)
     output:
@@ -77,7 +77,7 @@ process ALIGN {
     tag "${meta.id}"
     label 'high_memory'
     container { params.images.preprocess }
-    publishDir "${params.outdir}/${meta.id}/alignment", mode: 'copy'
+    publishDir { "${params.outdir}/${meta.id}/alignment" }, mode: 'copy'
     input:
     tuple val(meta), path(bam)
     tuple path(fasta, stageAs:'reference.fa'), path(fai, stageAs:'reference.fa.fai'), val(validated)
