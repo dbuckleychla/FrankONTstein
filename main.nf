@@ -1,4 +1,4 @@
-include { ADAPTIVE as PRIMARY; ADAPTIVE as SECONDARY; ADAPTIVE as TERTIARY } from './workflows/adaptive'
+include { PRIMARY; SECONDARY; TERTIARY; REPORTING } from './workflows/adaptive'
 
 workflow {
     def runState = [samples:[], provenance:[:], completed:Collections.synchronizedList([]), failureTask:null, error:null]
@@ -86,12 +86,18 @@ Profiles: -profile local,docker | slurm,apptainer | aws
         def parameterNames = ['bam','sample_id','input','demux_samplesheet','trim','sequencing_kit','genome','reference_bundle','targets_bed','enrichment_bed','callers','max_cpus','max_memory','max_time','qdnaseq_binsize','delly_bin_size','ichor_bin_size','clair3_gpu']
         provenance.parameters = parameterNames.collectEntries { key -> [(key):params[key]] }
         runState.provenance = provenance
-        if (plan.tier == 'primary') {
-            PRIMARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
-        } else if (plan.tier == 'secondary') {
-            SECONDARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
-        } else {
-            TERTIARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
+        PRIMARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, runState)
+        artifacts = PRIMARY.out.results
+        versions = PRIMARY.out.software
+        if (plan.tier == 'secondary') {
+            SECONDARY(PRIMARY.out.bam, PRIMARY.out.reference, PRIMARY.out.reference_assets)
+            artifacts = artifacts.mix(SECONDARY.out.results)
+            versions = versions.mix(SECONDARY.out.software)
+        } else if (plan.tier == 'tertiary') {
+            TERTIARY(PRIMARY.out.bam, PRIMARY.out.reference, PRIMARY.out.reference_assets, plan, resources)
+            artifacts = artifacts.mix(TERTIARY.out.results)
+            versions = versions.mix(TERTIARY.out.software)
         }
+        REPORTING(PRIMARY.out.bam, artifacts, versions, plan, provenance, runState)
     }
 }

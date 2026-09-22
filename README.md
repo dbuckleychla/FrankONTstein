@@ -12,6 +12,10 @@ Development release: workflow routing and BAM integrity checks are tested. Conta
 | `--secondary` | Primary plus NASVAR coverage, MAF, karyotype, CNVs, fusions and breakpoint consensus |
 | `--tertiary` | Primary plus the complete NASVAR pipeline and compatible oncoseq callers |
 
+Task names preserve analysis hierarchy: `PRIMARY:ALIGN` and `PRIMARY:CLASSY_COMBINED`
+in all modes; `SECONDARY:NASVAR` in secondary mode; `TERTIARY:NASVAR` and
+`TERTIARY:CALLING:...` in tertiary mode. Shared publishing uses `REPORTING:...`.
+
 Choose at most one tier. Tertiary exposes `nasvar,bcftools,clair3,clairsto,sniffles,severus,stellerator,qdnaseq,delly,subchrom,ichorcna`. Use `--callers nasvar,sniffles` to narrow its defaults. Selecting SubChrom adds its Clair3 prerequisite. Secondary permits only NASVAR; primary has no variant callers. Classy remains enabled in all tiers.
 
 Both **hg38/GRCh38** and **hs1/CHM13** are supported reference choices. CHM13 defaults exclude QDNAseq, SubChrom and ichorCNA; explicitly selecting one fails. Other caller assets must match the exact assembly version in your bundle.
@@ -36,6 +40,9 @@ Do **not** use unrestricted recursive submodule initialization: the pinned oncos
 Prepare a local image lock and a reference bundle using [the container guide](docs/containers.md) and [the reference guide](docs/references.md). No fake production image digests or redistributable classifier weights are supplied. `tests/fixtures/images.json` is exclusively for container-free contract tests.
 
 ## Run
+
+See [run examples](documentation/run-examples.md) for all tiers, trimming,
+demultiplexing, batches, resume, Slurm and AWS commands.
 
 For a reusable reference configuration, copy `assets/references.example.yaml` to
 `references.yaml` and
@@ -74,7 +81,13 @@ nextflow run . -profile local,docker \
   --image_manifest images.lock.json --secondary --outdir results
 ```
 
-Input BAMs must be **unaligned**, basecalled with modified-base calls, and contain valid MM/ML tags. The workflow validates these tags, aligns through Dorado's minimap2-backed aligner, and checks every primary read's sequence, modification probabilities, and read-group identity before/after alignment. Missing tags and stale MN coordinates fail; ordinary FASTQ conversion is not used.
+Input BAMs must be **unaligned**, basecalled with modified-base calls, and contain valid MM/ML tags. The workflow validates these tags, aligns through Dorado's minimap2-backed aligner, and validates the aligned BAM's modification encoding. Missing tags and stale MN coordinates fail; ordinary FASTQ conversion is not used. Alignment does not perform an exhaustive input/output read comparison or create a SQLite database.
+
+`check_bam.py` uses each task's allocated CPUs for bounded parallel MM/ML decoding,
+with one BAM reader and the remaining CPUs as workers. Every read is checked;
+no sampling is used. For standalone checks, use
+`python3 bin/check_bam.py sample.bam --unaligned --threads 8`.
+The default standalone setting (`--threads 1`) keeps serial execution.
 
 For multiple samples or BAM chunks, replace `--bam/--sample_id` with `--input samples.csv`:
 

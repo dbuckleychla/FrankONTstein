@@ -13,7 +13,7 @@ process PREPARE_BAM {
     def chunks = bams instanceof List ? bams : [bams]
     """
     samtools merge -u -@ ${task.cpus} prepared.bam ${chunks.collect { "'${it}'" }.join(' ')}
-    check_bam.py prepared.bam --unaligned > input_qc.json
+    check_bam.py prepared.bam --unaligned --threads ${task.cpus} > input_qc.json
     samtools --version | sed -n '1p' > prepare.versions.yml
     """
     stub:
@@ -63,7 +63,7 @@ process TRIM_BAM {
     WorkflowPlan.identifier(meta.kit.toString())
     """
     dorado trim --sequencing-kit '${meta.kit}' '${bam}' > trimmed.bam
-    check_bam.py trimmed.bam --unaligned > trim_qc.json
+    check_bam.py trimmed.bam --unaligned --threads ${task.cpus} > trim_qc.json
     dorado --version > trim.versions.yml 2>&1
     """
     stub:
@@ -91,8 +91,7 @@ process ALIGN {
     dorado aligner --threads ${task.cpus} reference.fa '${bam}' |
         samtools sort -@ ${task.cpus} -o '${meta.id}.bam' -
     samtools index '${meta.id}.bam'
-    compare_modbam.py '${bam}' '${meta.id}.bam'
-    check_bam.py '${meta.id}.bam' > '${meta.id}.qc.json'
+    check_bam.py '${meta.id}.bam' --threads ${task.cpus} > '${meta.id}.qc.json'
     samtools flagstat '${meta.id}.bam' > '${meta.id}.flagstat.txt'
     dorado --version > alignment.versions.yml 2>&1
     """

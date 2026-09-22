@@ -5,14 +5,12 @@ include { NASVAR } from '../modules/local/nasvar/main'
 include { CALLING } from '../subworkflows/local/calling'
 include { PUBLISH_ARTIFACT; RESULTS_INDEX; SOFTWARE_VERSIONS } from '../modules/local/report/main'
 
-workflow ADAPTIVE {
+workflow PRIMARY {
     take:
     samples
     ref
     assets
     plan
-    resources
-    provenance
     statusState
     main:
     VALIDATE_REFERENCE(ref, assets.enrichment, assets.targets, assets.repeats, assets.gff, assets.sites, assets.config, assets.reference, plan.callers.contains('nasvar'))
@@ -45,16 +43,56 @@ workflow ADAPTIVE {
     CLASSY_COMBINED(aligned.combine(VALIDATE_REFERENCE.out.reference).map { m,b,i,f,fi,v -> tuple(m,b,i,plan.genome,f,fi) })
     versions = versions.mix(ALIGN.out.versions, CLASSY_COMBINED.out.versions)
     artifacts = CLASSY_COMBINED.out.results.map { m,f -> tuple(m,'methylation',f) }
+    emit:
+    bam = aligned
+    reference = VALIDATE_REFERENCE.out.reference
+    reference_assets = VALIDATE_REFERENCE.out.assets
+    results = artifacts
+    software = versions
+}
+
+workflow SECONDARY {
+    take:
+    aligned
+    reference
+    assets
+    main:
+    NASVAR(aligned, reference, assets, 'secondary')
+    emit:
+    results = NASVAR.out.results.map { m,f -> tuple(m,'nasvar',f) }
+    software = NASVAR.out.results.map { m,d -> d.resolve('versions.txt') }
+}
+
+workflow TERTIARY {
+    take:
+    aligned
+    reference
+    assets
+    plan
+    resources
+    main:
+    CALLING(aligned, reference, assets, plan, resources)
+    artifacts = CALLING.out.results
+    versions = CALLING.out.software
     if (plan.callers.contains('nasvar')) {
-        NASVAR(aligned, VALIDATE_REFERENCE.out.reference, VALIDATE_REFERENCE.out.assets, plan.tier)
-        versions = versions.mix(NASVAR.out.results.map { m,d -> d.resolve('versions.txt') })
+        NASVAR(aligned, reference, assets, 'tertiary')
         artifacts = artifacts.mix(NASVAR.out.results.map { m,f -> tuple(m,'nasvar',f) })
+        versions = versions.mix(NASVAR.out.results.map { m,d -> d.resolve('versions.txt') })
     }
-    if (plan.tier == 'tertiary') {
-        CALLING(aligned, VALIDATE_REFERENCE.out.reference, VALIDATE_REFERENCE.out.assets, plan, resources)
-        artifacts = artifacts.mix(CALLING.out.results)
-        versions = versions.mix(CALLING.out.software)
-    }
+    emit:
+    results = artifacts
+    software = versions
+}
+
+workflow REPORTING {
+    take:
+    aligned
+    artifacts
+    versions
+    plan
+    provenance
+    statusState
+    main:
     PUBLISH_ARTIFACT(artifacts)
     records = PUBLISH_ARTIFACT.out.results.map { m,a,files ->
         statusState.completed.add([sample:m.id, analysis:a])

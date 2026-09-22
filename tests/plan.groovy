@@ -33,7 +33,7 @@ rejects { planner.samples(rows,[[sample:'s2',run:'r2',kit:'kit',barcode:'barcode
 rejects { planner.samples([[sample:'bad name',run:'r',bam:'x']],[],false) }
 println '7 sample manifest assertions passed'
 def statusClass = loader.parseClass(new File('lib/RunStatus.groovy'))
-def summary = statusClass.summarize(['s1'],['nasvar'], 'name\tstatus\nADAPTIVE:ALIGN (s1)\tCOMPLETED\nADAPTIVE:NASVAR (s1:secondary)\tFAILED\n')
+def summary = statusClass.summarize(['s1'],['nasvar'], 'name\tstatus\nPRIMARY:ALIGN (s1)\tCOMPLETED\nSECONDARY:NASVAR (s1:secondary)\tFAILED\n')
 assert summary.find { it.analysis == 'alignment' }.status == 'completed'
 assert summary.find { it.analysis == 'nasvar' }.status == 'failed'
 assert summary.find { it.analysis == 'methylation' }.status == 'not_completed'

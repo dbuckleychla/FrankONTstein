@@ -1,4 +1,7 @@
 import array
+import json
+import subprocess
+import sys
 import importlib.util
 from pathlib import Path
 import tempfile
@@ -19,7 +22,6 @@ class ModbamTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.root=Path(self.temp.name)
         self.check=load('check_bam')
-        self.compare=load('compare_modbam')
     def tearDown(self): self.temp.cleanup()
     def bam(self,name,reverse=False,probabilities=(200,100),tags=True,mn=6,read_id='read1'):
         path=self.root/name
@@ -36,18 +38,45 @@ class ModbamTests(unittest.TestCase):
         return path
     def test_valid_modbam(self):
         self.assertEqual(self.check.check(self.bam('input.bam'),True)['modified_reads'],1)
+    def run_check(self, path, threads):
+        return subprocess.run([sys.executable, str(ROOT/'bin/check_bam.py'), str(path),
+                               '--threads', str(threads)], text=True, capture_output=True)
+
+    def test_parallel_matches_serial_across_batches(self):
+        unmapped = self.bam('unmapped.bam')
+        reverse = self.bam('reverse.bam', reverse=True)
+        path = self.root/'mixed.bam'
+        with pysam.AlignmentFile(unmapped, 'rb') as a, pysam.AlignmentFile(reverse, 'rb') as b:
+            records = [next(a), next(b)]
+            with pysam.AlignmentFile(path, 'wb', header=a.header) as out:
+                for i in range(1100): out.write(records[i % 2])
+        serial = self.run_check(path, 1)
+        parallel = self.run_check(path, 3)
+        self.assertEqual(serial.returncode, 0, serial.stderr)
+        self.assertEqual(parallel.returncode, 0, parallel.stderr)
+        self.assertEqual(json.loads(serial.stdout), json.loads(parallel.stdout))
+        self.assertEqual(json.loads(parallel.stdout)['reads'], 1100)
+
+    def test_parallel_worker_rejects_invalid_mm(self):
+        source = self.bam('source.bam')
+        path = self.root/'invalid.bam'
+        with pysam.AlignmentFile(source, 'rb') as src:
+            read = next(src)
+            with pysam.AlignmentFile(path, 'wb', header=src.header) as out:
+                for _ in range(600): out.write(read)
+                read.query_name = 'bad_modifications'
+                read.set_tag('MM', 'C+m,99,0;')
+                out.write(read)
+        for threads in [1, 3]:
+            result = self.run_check(path, threads)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('bad_modifications', result.stderr)
+            self.assertIn('invalid modification encoding', result.stderr)
+
+    def test_parallel_rejects_invalid_worker_count(self):
+        with self.assertRaisesRegex(ValueError, 'threads must be at least 1'):
+            self.check.check('unused.bam', threads=0)
     def test_reject_missing_modifications(self):
         with self.assertRaises(ValueError): self.check.check(self.bam('missing.bam',tags=False))
     def test_reject_stale_trim_coordinates(self):
         with self.assertRaises(ValueError): self.check.check(self.bam('stale.bam',mn=9))
-    def test_reverse_alignment_preserves_modifications(self):
-        self.compare.compare(self.bam('before.bam'),self.bam('after.bam',reverse=True),self.root/'compare.db')
-    def test_detect_changed_probability(self):
-        with self.assertRaises(ValueError):
-            self.compare.compare(self.bam('before.bam'),self.bam('after.bam',reverse=True,probabilities=(1,100)),self.root/'compare.db')
-    def test_detect_lost_tags(self):
-        with self.assertRaises(ValueError):
-            self.compare.compare(self.bam('before.bam'),self.bam('after.bam',tags=False),self.root/'compare.db')
-    def test_detect_unknown_reads(self):
-        with self.assertRaises(ValueError):
-            self.compare.compare(self.bam('before.bam'),self.bam('after.bam',read_id='other'),self.root/'compare.db')

@@ -7,6 +7,8 @@ WORKDIR /src
 COPY vendor/nasvar/ ./
 RUN cargo build --release --locked
 FROM ${RUNTIME_IMAGE}
-RUN apt-get update && apt-get install -y --no-install-recommends python3 libssl3 libbz2-1.0 liblzma5 zlib1g ca-certificates && rm -rf /var/lib/apt/lists/*
+# Nextflow's task metrics wrapper requires ps from procps inside the container.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 procps libssl3 libbz2-1.0 liblzma5 zlib1g ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/target/release/nasvar /src/target/release/aggregate /usr/local/bin/
 COPY licenses/NASVAR.txt /usr/share/licenses/nasvar/LICENSE
+RUN ps -eo pid,ppid,pcpu,pmem,comm >/dev/null

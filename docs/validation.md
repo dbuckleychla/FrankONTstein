@@ -2,6 +2,12 @@
 
 ## Automated checks
 
+Parallel BAM validation checks serial/parallel QC equality across multiple batches,
+reverse-strand records, and propagation of malformed MM errors from workers. A
+local synthetic benchmark (12,000 reads, 8 kb/read, 2,000 modifications/read) took
+2.56 s at 1 CPU, 1.04 s at 4 CPUs, and 0.57 s at 8 CPUs. This measures tag decoding
+on synthetic data, not production storage or full pipeline throughput.
+
 ### Nextflow 26 migration (2026-09-22)
 
 Validated using Nextflow 26.04.6 from the local conda environment with its default
@@ -18,7 +24,7 @@ recorded below concerned the earlier 25.10.2 Java-jar test environment.
 
 - `tests/plan.groovy`: tier selection, prerequisites, aliases, incompatibilities and identifiers.
 - Python unit tests: coordinates, samplesheets, NASVAR error detection/section preservation, and report escaping.
-- `tests/test_modbam.py`: real small BAM records created with pysam; checks reverse-strand alignment, lost tags, changed probabilities, unknown reads and stale trim coordinates.
+- `tests/test_modbam.py`: small BAM records created with pysam; checks missing tags, stale trim coordinates, malformed modification encoding and serial/parallel QC agreement, including reverse-strand records.
 - `tests/run_contracts.py`: all three analysis graphs, demultiplexing, optional trimming, output grouping and cache reuse, using explicit stub data and mock upstream executables. It never runs biological callers.
 - Terraform formatting and provider validation.
 

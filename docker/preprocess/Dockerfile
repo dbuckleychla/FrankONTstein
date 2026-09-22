@@ -3,7 +3,8 @@
 ARG DORADO_IMAGE=ghcr.io/chusj-pigu/dorado:851b0a37ecbff6b3b952c811b31dad48ca6bf995
 FROM ${DORADO_IMAGE}
 USER root
-RUN dnf install -y python3 python3-pip ca-certificates gcc make wget tar bzip2 \
+# Nextflow's task metrics wrapper requires ps from procps-ng.
+RUN dnf install -y python3 python3-pip procps-ng ca-certificates gcc make wget tar bzip2 \
         zlib-devel bzip2-devel xz-devel ncurses-devel libcurl-devel openssl-devel \
     && dnf clean all \
     && rm -rf /var/cache/dnf
@@ -21,5 +22,6 @@ RUN mkdir -p /tmp/samtools-build \
     && cd / \
     && rm -rf /tmp/samtools-build
 RUN dorado --version && samtools --version && python3 -c 'import pysam'
+RUN ps -eo pid,ppid,pcpu,pmem,comm >/dev/null
 ENTRYPOINT []
 CMD ["/bin/bash"]

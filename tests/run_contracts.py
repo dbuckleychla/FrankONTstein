@@ -49,6 +49,16 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
                 assert (out/sample/'methylation/classy'/f'{sample}_combined_classification.json').is_file()
                 assert not (out/sample/'methylation/methylation').exists()
         if tier=='secondary': assert (out/'demultiplex/run1/demux/unclassified.bam').exists()
+        with (out/'pipeline_info/trace.tsv').open() as handle:
+            names = [r['name'] for r in csv.DictReader(handle, delimiter='\t')]
+        assert any(n.startswith('PRIMARY:ALIGN (') for n in names), names
+        assert any(n.startswith('PRIMARY:CLASSY_COMBINED (') for n in names), names
+        if tier == 'secondary':
+            assert any(n.startswith('SECONDARY:NASVAR (') for n in names), names
+        if tier == 'tertiary':
+            assert any(n.startswith('TERTIARY:NASVAR (') for n in names), names
+            assert any(n.startswith('TERTIARY:CALLING:SNIFFLES_CALL (') for n in names), names
+            assert not any(n.startswith('SECONDARY:') for n in names), names
         if a.skip_resume_check: continue
         subprocess.run(args+['-resume',result['run']['session_id']],cwd=root,env=env,check=True)
         with (out/'pipeline_info/trace.tsv').open() as handle:
