@@ -20,6 +20,40 @@ nasvar = load('run_nasvar')
 report = load('make_report')
 
 class ReferenceTests(unittest.TestCase):
+    def test_gff_tabs_preserve_spaces_and_aliases(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'genes.gff3'
+            config = Path(d) / 'reference.json'
+            config.write_text(json.dumps({'contigs':[{'name':'chr1','accession':'NC_000001.11'}]}))
+            aliases = reference.contig_aliases(config, {'chr1':100})
+            text = ('##gff-version 3\nNC_000001.11\tBest RefSeq\tpseudogene\t1\t100\t.\t+\t.\t'
+                    'ID=gene-A;Name=A;description=some gene\n##FASTA\n>NC_000001.11\nACGT\n')
+            path.write_text(text)
+            reference.coordinates(path, {'chr1':100}, 'gff', aliases)
+            self.assertEqual(path.read_text(), text)
+            with self.assertRaisesRegex(ValueError, 'no coordinate records overlap'):
+                reference.coordinates(path, {'chr1':100}, 'gff')
+            path.write_text(text.replace('\t100\t', '\t101\t'))
+            with self.assertRaisesRegex(ValueError, 'exceeds'):
+                reference.coordinates(path, {'chr1':100}, 'gff', aliases)
+
+    def test_gff_malformed_columns_report_line(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'genes.gff3'
+            path.write_text('##gff-version 3\nchr1 source gene 1 10 . + . ID=a\n')
+            with self.assertRaisesRegex(ValueError, 'genes.gff3:2: GFF3 requires 9 tab-separated'):
+                reference.coordinates(path, {'chr1':100}, 'gff')
+            path.write_text('chr1\tsource\tgene\tpseudogene\t10\t.\t+\t.\tID=a\n')
+            with self.assertRaisesRegex(ValueError, 'genes.gff3:1: invalid gff coordinate'):
+                reference.coordinates(path, {'chr1':100}, 'gff')
+
+    def test_reference_alias_conflict(self):
+        with tempfile.TemporaryDirectory() as d:
+            config = Path(d) / 'reference.json'
+            config.write_text(json.dumps({'contigs':[{'name':'chr1','accession':'NC_000001.11'}]}))
+            with self.assertRaisesRegex(ValueError, 'conflicting FASTA lengths'):
+                reference.contig_aliases(config, {'chr1':100,'NC_000001.11':101})
+
     def test_primary_contigs_required(self):
         lengths = dict.fromkeys(reference.PRIMARY_CONTIGS, 100)
         reference.primary_contigs(lengths)

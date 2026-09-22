@@ -33,8 +33,11 @@ The bundle requires uncompressed FASTA and its FAI. Relative paths resolve again
 The target BED and enrichment BED are always CLI inputs, never inferred from each other or from a genome bundle. BED coordinates are zero-based half-open. GFF3 and NASVAR site coordinates are one-based. Headers in the sites TSV are not supported. The FASTA index must contain chr1–chr22, chrX and chrY. Coordinate checks cover
 shared contigs; annotation-only contigs are reported and skipped during validation
 without modifying the input. Each asset must have at least one matching record.
-Primary chromosome aliases (such as NC_000001.11 versus chr1) still need explicit
-normalization; this check does not rename or lift over caller inputs.
+NASVAR GFF3 and SNP-site coordinates can use chromosome aliases declared in its
+selected reference JSON (for example NC_000001.11 versus chr1). The workflow
+passes that JSON to preflight using `--reference-config`. BED inputs still use
+FASTA contig names. Validation never rewrites or lifts over the files. GFF3
+requires nine tab-separated columns; spaces inside fields are preserved.
 
 | Analysis | Bundle assets |
 | --- | --- |

@@ -14,7 +14,7 @@ process VALIDATE_REFERENCE {
     tuple path('reference.fa'), path('reference.fa.fai'), val(true), emit: reference
     path 'assets', emit: assets
     script:
-    def extra = nasvar_enabled ? '--bed assets/repeats.bed --gff assets/genes.gff3 --sites assets/sites.tsv' : ''
+    def extra = nasvar_enabled ? '--reference-config assets/reference.json --bed assets/repeats.bed --gff assets/genes.gff3 --sites assets/sites.tsv' : ''
     """
     mkdir assets
     cp -L input/* assets/

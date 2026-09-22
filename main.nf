@@ -1,4 +1,4 @@
-include { ADAPTIVE } from './workflows/adaptive'
+include { ADAPTIVE as PRIMARY; ADAPTIVE as SECONDARY; ADAPTIVE as TERTIARY } from './workflows/adaptive'
 
 workflow {
     def runState = [samples:[], provenance:[:], completed:Collections.synchronizedList([]), failureTask:null, error:null]
@@ -86,6 +86,12 @@ Profiles: -profile local,docker | slurm,apptainer | aws
         def parameterNames = ['bam','sample_id','input','demux_samplesheet','trim','sequencing_kit','genome','reference_bundle','targets_bed','enrichment_bed','callers','max_cpus','max_memory','max_time','qdnaseq_binsize','delly_bin_size','ichor_bin_size','clair3_gpu']
         provenance.parameters = parameterNames.collectEntries { key -> [(key):params[key]] }
         runState.provenance = provenance
-        ADAPTIVE(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
+        if (plan.tier == 'primary') {
+            PRIMARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
+        } else if (plan.tier == 'secondary') {
+            SECONDARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
+        } else {
+            TERTIARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, resources, provenance, runState)
+        }
     }
 }
