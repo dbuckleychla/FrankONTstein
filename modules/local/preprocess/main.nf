@@ -59,9 +59,10 @@ process TRIM_BAM {
     tuple val(meta), path('trimmed.bam'), emit: bam
     path 'trim.versions.yml', emit: versions
     script:
-    def kit = meta.kit ? "-k '${meta.kit}'" : ''
+    if (!meta.kit) error 'Dorado trimming requires a sequencing kit in sample metadata'
+    WorkflowPlan.identifier(meta.kit.toString())
     """
-    dorado trim ${kit} '${bam}' > trimmed.bam
+    dorado trim --sequencing-kit '${meta.kit}' '${bam}' > trimmed.bam
     check_bam.py trimmed.bam --unaligned > trim_qc.json
     dorado --version > trim.versions.yml 2>&1
     """

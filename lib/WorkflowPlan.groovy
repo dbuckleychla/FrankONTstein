@@ -35,12 +35,15 @@ class WorkflowPlan {
     }
     static Map resolve(Map p, Map bundle) {
         p = new LinkedHashMap(p)
-        ['primary','secondary','tertiary'].each { key ->
+        ['primary','secondary','tertiary','trim'].each { key ->
             if (p[key] instanceof String && p[key] in ['true','false']) p[key] = p[key].toBoolean()
         }
-        ['primary','secondary','tertiary'].each { key ->
+        ['primary','secondary','tertiary','trim'].each { key ->
             if (p[key] != null && !(p[key] instanceof Boolean)) throw new IllegalArgumentException("${key} must be boolean")
         }
+        if (p.trim == true && !p.demux_samplesheet && !p.sequencing_kit?.toString()?.trim())
+            throw new IllegalArgumentException('--trim requires --sequencing_kit, or a --demux_samplesheet with a kit for every run')
+        if (p.sequencing_kit) identifier(p.sequencing_kit.toString())
         def flags = ['primary','secondary','tertiary'].findAll { p[it] == true }
         if (flags.size() > 1) throw new IllegalArgumentException('Choose only one analysis tier')
         def tier = flags ? flags[0] : 'primary'

@@ -97,7 +97,11 @@ run1,SQK-NBD114-24,barcode02,sample2
 
 Every run must have one kit and unique barcode-to-sample mappings. A sample may occur only once in the demultiplexing sheet in this release. Unclassified BAMs are retained under `demultiplex/`. A requested barcode with no output or no modification-tagged reads fails explicitly; it is never silently reassigned to another sample.
 
-Demultiplexing precedes trimming. Add `--trim` for optional Dorado trimming; for a single-sample run, optionally provide `--sequencing_kit`. Trimming is off by default. Data basecalled with barcodes already removed may not be demultiplexable.
+Demultiplexing precedes trimming. Add `--trim --sequencing_kit KIT_NAME` for
+Dorado trimming. With `--demux_samplesheet`, the kit comes from each run's `kit`
+column instead. Preflight rejects trimming without a kit before analysis starts.
+Trimming is off by default. Data basecalled with barcodes already removed may not
+be demultiplexable.
 
 ## Execution and outputs
 

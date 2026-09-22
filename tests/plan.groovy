@@ -54,3 +54,11 @@ assert planner.resolve([primary:'false',secondary:'true'],hg38).tier == 'seconda
 assert planner.resolve([primary:'false',secondary:'false',tertiary:'true'],hg38).tier == 'tertiary'
 rejects { planner.resolve([primary:'yes'],hg38) }
 println '3 strict-parser CLI boolean assertions passed'
+rejects { planner.resolve([trim:true], hg38) }
+rejects { planner.resolve([trim:'true',sequencing_kit:'  '], hg38) }
+assert planner.resolve([trim:false], hg38).tier == 'primary'
+assert planner.resolve([trim:'false'], hg38).tier == 'primary'
+assert planner.resolve([trim:true,sequencing_kit:'SQK-LSK114'], hg38).tier == 'primary'
+assert planner.resolve([trim:true,demux_samplesheet:'demux.csv'], hg38).tier == 'primary'
+rejects { planner.samples(rows, [[sample:'s2',run:'r1',kit:'',barcode:'barcode01']], true) }
+println '7 trimming kit preflight assertions passed'

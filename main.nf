@@ -19,7 +19,9 @@ Required: --bam FILE --sample_id ID OR --input manifest.csv
           --targets_bed targets.bed
           --enrichment_bed enrichment.bed --image_manifest images.json
 Tier:     --primary (default), --secondary, or --tertiary
-Optional: --demux_samplesheet demux.csv --trim --callers nasvar,sniffles
+Optional: --demux_samplesheet demux.csv --trim --sequencing_kit KIT_NAME
+          --callers nasvar,sniffles
+Trimming requires --sequencing_kit or the demux sheet's kit column.
 Profiles: -profile local,docker | slurm,apptainer | aws
 '''
     } else {
