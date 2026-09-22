@@ -50,6 +50,11 @@ custom images to `ghcr.io/<owner>/<repository>` (lowercase), which is
 `preprocess-<git commit>` and `nasvar-<git commit>`. It does not run on pull
 requests or ordinary pushes.
 
+The image-build job initializes only the pinned NASVAR source submodule. It does
+not clone oncoseq or its nested caller modules. Preprocessing pulls its Dorado
+base image; generating the final image lock queries upstream caller registry
+metadata without downloading their container layers.
+
 Authentication uses the built-in `GITHUB_TOKEN` with `packages: write`; no custom
 registry secrets are needed. Both images are labeled with their source repository
 so the package can inherit repository access. After the first successful push,
