@@ -42,23 +42,21 @@ python3 bin/lock_images.py --preprocess "$PREPROCESS_IMAGE" \
 
 The utility reads registry metadata only; it does not build, run or publish images. Override the source JSON for private mirrors or ECR. Classifier weights inside an upstream image still retain their own terms: verify redistribution rights before mirroring. For restricted weights, use an appropriately licensed private Classy image with the model layout expected by oncoseq's Classy module.
 
-## GitHub Actions publishing to Docker Hub
+## GitHub Actions publishing to GHCR
 
 The manually triggered `Build custom analysis images` workflow publishes both
-custom images to the single Docker Hub repository `dbuckley/frankontstein`, using
-tags `preprocess-<git commit>` and `nasvar-<git commit>`. It does not run on pull
-requests or ordinary pushes. Create that repository on Docker Hub and make it
-public for unauthenticated user pulls.
+custom images to `ghcr.io/<owner>/<repository>` (lowercase), which is
+`ghcr.io/dbuckleychla/frankontstein` for this repository. Tags are
+`preprocess-<git commit>` and `nasvar-<git commit>`. It does not run on pull
+requests or ordinary pushes.
 
-Set repository Actions secrets `DOCKERHUB_USERNAME` (the Docker Hub login with
-write access to that repository) and `DOCKERHUB_TOKEN` (a Docker Hub access token
-with write permission). GitHub's built-in token cannot authenticate to Docker Hub.
-Using the GitHub CLI, enter each value at the hidden prompt:
-
-```bash
-gh secret set DOCKERHUB_USERNAME --repo dbuckleychla/FrankONTstein
-gh secret set DOCKERHUB_TOKEN --repo dbuckleychla/FrankONTstein
-```
+Authentication uses the built-in `GITHUB_TOKEN` with `packages: write`; no custom
+registry secrets are needed. Both images are labeled with their source repository
+so the package can inherit repository access. After the first successful push,
+set the GHCR package visibility to **Public** in its package settings to allow
+unauthenticated pulls. A public source repository does not automatically make
+its container package public. If a package already exists without repository
+access, grant this repository Actions access in the package settings.
 
 After pushing the workflow changes, dispatch without any inputs. The job reads
 `assets/container_bases.json`, resolves all three references to immutable digests,
