@@ -20,6 +20,111 @@ Choose at most one tier. Tertiary exposes `nasvar,bcftools,clair3,clairsto,sniff
 
 Both **hg38/GRCh38** and **hs1/CHM13** are supported reference choices. CHM13 defaults exclude QDNAseq, SubChrom and ichorCNA; explicitly selecting one fails. Other caller assets must match the exact assembly version in your bundle.
 
+### Primary: alignment and methylation
+
+Optional demultiplexing and trimming are bypassed when disabled. Reference
+validation gates alignment; input preparation can run alongside it.
+
+```mermaid
+flowchart TD
+    I["Unaligned BAMs: single sample or manifest"] --> P["PRIMARY:PREPARE_BAM<br/>Merge chunks and validate modified-base tags"]
+    R["FASTA + index, targets BED, enrichment BED"] --> V["PRIMARY:VALIDATE_REFERENCE"]
+    P --> D{"Demultiplex?"}
+    S["Demultiplex samplesheet"] -.-> D
+    D -->|Yes| DX["PRIMARY:DEMULTIPLEX"]
+    DX --> U["Unclassified BAM output"]
+    DX --> T{"Trim?"}
+    D -->|No| T
+    T -->|Yes: sequencing kit required| TR["PRIMARY:TRIM_BAM<br/>Dorado trim and tag validation"]
+    T -->|No| A["PRIMARY:ALIGN<br/>Dorado alignment, sort, index and QC"]
+    TR --> A
+    V --> A
+    A --> C["PRIMARY:CLASSY_COMBINED<br/>Methylation classification and plots"]
+    A --> O["Per-sample alignment outputs"]
+    C --> M["methylation/classy/"]
+    O --> REPORT["REPORTING<br/>HTML index, manifest and provenance"]
+    M --> REPORT
+```
+
+### Secondary: primary plus NASVAR CNV and SV analysis
+
+The primary block below includes the complete preparation and alignment flow
+above. NASVAR subcommands run sequentially inside one `SECONDARY:NASVAR` task;
+Classy runs independently once alignment finishes.
+
+```mermaid
+flowchart TD
+    I["BAMs + references + target/enrichment BEDs"] --> P["PRIMARY<br/>Validate, prepare, optional demux/trim, align and QC"]
+    P --> A["Sorted, indexed BAM"]
+    A --> C["PRIMARY:CLASSY_COMBINED"]
+    A --> N1
+    subgraph NASVAR["SECONDARY:NASVAR"]
+        N1["Coverage"] --> N2["MAF"]
+        N2 --> N3["Karyotype and blast ratio"]
+        N3 --> N4["CNV"]
+        N4 --> N5["Fusions"]
+        N5 --> N6["Breakpoint consensus"]
+        N6 --> N7["NASVAR report"]
+    end
+    N7 --> NOUT["nasvar/"]
+    C --> MOUT["methylation/classy/"]
+    A --> REPORT["REPORTING<br/>HTML index, manifest and provenance"]
+    MOUT --> REPORT
+    NOUT --> REPORT
+```
+
+### Tertiary: full analysis stack
+
+This shows the default hg38 caller set; `--callers` can narrow it. QDNAseq,
+SubChrom and ichorCNA are excluded on CHM13. Each caller retains separate results;
+target filtering runs separately for each small-variant output, without merging
+calls. NASVAR executes its full pipeline once, including SNV and ITD analysis.
+
+```mermaid
+flowchart TD
+    I["BAMs + references + target/enrichment BEDs"] --> P["PRIMARY<br/>Validate, prepare, optional demux/trim, align and QC"]
+    P --> A["Sorted, indexed BAM"]
+    A --> CLASSY["PRIMARY:CLASSY_COMBINED"]
+    A --> NASVAR["TERTIARY:NASVAR<br/>Full pipeline: CNV, karyotype, SV/fusions, SNV, ITD and report"]
+    A --> MP["BCFTOOLS_MPILEUP"]
+    MP --> BC["BCFTOOLS_CALL"]
+    A --> C3["CLAIR3"]
+    A --> CS["CLAIRS_TO_CALL"]
+    A --> SN["SNIFFLES_CALL"]
+    A --> SE["SEVERUS_TUMOR_UNPHASED"]
+    A --> ST["STELLERATOR"]
+    A --> OFF["OFF_TARGET_BAM<br/>Exclude enrichment regions"]
+    OFF --> Q["QDNASEQ_CALL"]
+    OFF --> DE["DELLY"]
+    OFF --> H["HMMCOPY_WIG"]
+    H --> IC["ICHORCNA"]
+    A --> SUB["SUBCHROM"]
+    C3 --> SUB
+    BC --> F["FILTER_VARIANTS<br/>Target-filter and index each caller output"]
+    C3 --> F
+    CS --> F
+    BC --> RAW["Raw small-variant outputs by caller"]
+    C3 --> RAW
+    CS --> RAW
+    F --> OUT["Separate per-caller output directories"]
+    RAW --> OUT
+    SN --> OUT
+    SE --> OUT
+    ST --> OUT
+    Q --> OUT
+    DE --> OUT
+    IC --> OUT
+    SUB --> OUT
+    NASVAR --> OUT
+    OUT --> REPORT["REPORTING<br/>HTML index, manifest and provenance"]
+    CLASSY --> REPORT
+    A --> REPORT
+```
+
+Caller nodes other than NASVAR belong to `TERTIARY:CALLING`. Step-specific
+reference assets and software-version channels are omitted from these diagrams
+for readability.
+
 ## Setup
 
 The workflow uses syntax compatible with Nextflow's strict v2 parser, the default

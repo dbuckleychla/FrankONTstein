@@ -11,8 +11,8 @@ process OFF_TARGET_BAM {
     tuple val(meta), path('offtarget.bam'), path('offtarget.bam.bai'), emit: bam
     script:
     """
-    samtools view -b -L '${assets}/enrichment.bed' -U offtarget.bam -o /dev/null '${bam}'
-    samtools index offtarget.bam
+    samtools view -@ ${task.cpus - 1} -b -L '${assets}/enrichment.bed' -U offtarget.bam -o /dev/null '${bam}'
+    samtools index -@ ${task.cpus - 1} offtarget.bam
     """
     stub:
     """
