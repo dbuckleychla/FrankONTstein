@@ -99,6 +99,15 @@
       ],
       "default": "sup",
       "description": "Bundled Clair3 model selection: sup uses SUP v5.0; hac and fast use HAC v5.0."
+    },
+    "disable_qc": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip comprehensive QC; retain CpG bedMethyl, Classy and required validation."
+    },
+    "disable-qc": {
+      "type": "boolean",
+      "description": "CLI alias for disable_qc; takes precedence when supplied."
     }
   },
   "required": [

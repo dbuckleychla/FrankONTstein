@@ -68,3 +68,15 @@ assert planner.clair3Model('sup') == '/opt/models/r1041_e82_400bps_sup_v500'
 assert planner.clair3Model('hac') == '/opt/models/r1041_e82_400bps_hac_v500'
 assert planner.clair3Model('fast') == '/opt/models/r1041_e82_400bps_hac_v500'
 try { planner.clair3Model('typo'); assert false } catch (IllegalArgumentException expected) { }
+
+assert planner.qcDisabled([:]) == false
+assert planner.qcDisabled(['disable-qc':'true',disable_qc:false]) == true
+assert planner.qcDisabled([disable_qc:'false']) == false
+rejects { planner.qcDisabled(['disable-qc':'yes']) }
+assert planner.resolve([primary:true,'disable-qc':true], hg38).skipped.any { it.caller == 'qc' }
+
+assert planner.qcDisabled([disableQc:'true',disable_qc:false]) == true
+
+def qcFailure = statusClass.summarize(['s1'], ['qc','bedmethyl'], 'name\tstatus\nPRIMARY:SAMPLE_QC (s1)\tFAILED\nPRIMARY:INDEX_BEDMETHYL (s1)\tFAILED\n')
+assert qcFailure.find { it.analysis == 'qc' }.status == 'failed'
+assert qcFailure.find { it.analysis == 'bedmethyl' }.status == 'failed'

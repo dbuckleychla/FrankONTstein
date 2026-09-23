@@ -35,6 +35,14 @@
 - Update dependency lock, gitlinks, images, compatibility inventory, and affected
   tests together. Never modify the user's external source checkouts.
 
+## QC
+- All tiers produce indexed modkit CpG bedMethyl, retaining separate 5mC/5hmC.
+- Comprehensive QC defaults on; disable_qc skips QC, not bedMethyl or Classy.
+- Keep whole-genome/on-enrichment/off-enrichment/target denominators explicit;
+  report MAPQ 0 and 20 coverage separately and null for undefined quantities.
+- Large BAMs require streaming, bounded summaries and capped parallelism. Do not
+  introduce per-read databases or full per-base intermediate tables.
+
 ## Validation and release
 - Use strict Nextflow v2 syntax; test Nextflow 26 and keep vendor gitlinks unchanged.
   Keep callback helpers in lib/ and use explicit closures for dynamic publish paths.

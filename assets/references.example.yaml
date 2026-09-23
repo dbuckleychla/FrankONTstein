@@ -13,6 +13,8 @@ image_manifest: images.lock.json
 # Assets must match --genome; see docs/reference-sources.md.
 # Basecaller accuracy: sup, hac or fast; selects bundled Clair3 weights.
 basecall_model: sup
+# Skip comprehensive QC only; bedMethyl and Classy remain enabled.
+disable_qc: false
 steps:
 
   # Pediatric leukemia configs selected automatically by genome.

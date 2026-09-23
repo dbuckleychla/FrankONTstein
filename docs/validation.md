@@ -1,5 +1,28 @@
 # Validation and release status
 
+## QC extension validation
+
+Numerical tests use real pysam-generated BAMs and samtools depth to check mapped
+fractions, exact length statistics, overlapping BED denominators, deletion
+handling, MAPQ strata, CpG beta/depth denominators, missing 5hmC and zero coverage.
+The QC CLI test creates indexed BGZF bedMethyl and generates JSON/TSV/HTML.
+A local synthetic BAM/depth benchmark (10,000 reads of 10 kb over two contigs;
+100 Mb query sequence) took 5.77 seconds with a 2-CPU budget and 3.35 seconds
+with a 4-CPU budget, with identical metrics. This does not measure modkit,
+production BAM sizes, or network-storage throughput. These
+fixtures are synthetic; they are not biological validation of modification calls.
+
+Run the production-image smoke test on a Docker-capable Linux host:
+
+```bash
+python3 tests/run_qc_container_smoke.py --image-manifest images.lock.json
+```
+
+This runs actual modkit on synthetic modified-base reads, indexes its output and
+runs the QC suite. Local Docker access was unavailable during implementation;
+the production-image smoke and representative large-BAM runtime/memory benchmark
+remain unverified. Stub contracts cover all tiers, QC disabled, and resume.
+
 ## Automated checks
 
 Parallel BAM validation checks serial/parallel QC equality across multiple batches,

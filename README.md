@@ -8,7 +8,7 @@ Development release: workflow routing and BAM integrity checks are tested. Conta
 
 | Option | Analyses |
 | --- | --- |
-| `--primary` (default) | Alignment/QC and methylation classification with Classy |
+| `--primary` (default) | Alignment, comprehensive QC, CpG bedMethyl and Classy methylation classification |
 | `--secondary` | Primary plus NASVAR coverage, MAF, karyotype, CNVs, fusions and breakpoint consensus |
 | `--tertiary` | Primary plus the complete NASVAR pipeline and compatible oncoseq callers |
 
@@ -39,6 +39,11 @@ flowchart TD
     T -->|No| A["PRIMARY:ALIGN<br/>Dorado alignment, sort, index and QC"]
     TR --> A
     V --> A
+    A --> BED["MODKIT_PILEUP + INDEX_BEDMETHYL<br/>CpG bedMethyl"]
+    BED --> QC["SAMPLE_QC: enabled by default"]
+    A --> QC
+    QC --> REPORT
+    BED --> REPORT
     A --> C["PRIMARY:CLASSY_COMBINED<br/>Methylation classification and plots"]
     A --> O["Per-sample alignment outputs"]
     C --> M["methylation/classy/"]
@@ -56,6 +61,11 @@ Classy runs independently once alignment finishes.
 flowchart TD
     I["BAMs + references + target/enrichment BEDs"] --> P["PRIMARY<br/>Validate, prepare, optional demux/trim, align and QC"]
     P --> A["Sorted, indexed BAM"]
+    A --> BED["PRIMARY: CpG bedMethyl"]
+    BED --> QC["PRIMARY:SAMPLE_QC: enabled by default"]
+    A --> QC
+    QC --> REPORT
+    BED --> REPORT
     A --> C["PRIMARY:CLASSY_COMBINED"]
     A --> N1
     subgraph NASVAR["SECONDARY:NASVAR"]
@@ -84,6 +94,11 @@ calls. NASVAR executes its full pipeline once, including SNV and ITD analysis.
 flowchart TD
     I["BAMs + references + target/enrichment BEDs"] --> P["PRIMARY<br/>Validate, prepare, optional demux/trim, align and QC"]
     P --> A["Sorted, indexed BAM"]
+    A --> BED["PRIMARY: CpG bedMethyl"]
+    BED --> QC["PRIMARY:SAMPLE_QC: enabled by default"]
+    A --> QC
+    QC --> REPORT
+    BED --> REPORT
     A --> CLASSY["PRIMARY:CLASSY_COMBINED"]
     A --> NASVAR["TERTIARY:NASVAR<br/>Full pipeline: CNV, karyotype, SV/fusions, SNV, ITD and report"]
     A --> MP["BCFTOOLS_MPILEUP"]
@@ -124,6 +139,15 @@ flowchart TD
 Caller nodes other than NASVAR belong to `TERTIARY:CALLING`. Step-specific
 reference assets and software-version channels are omitted from these diagrams
 for readability.
+
+## CpG output and QC
+
+All tiers produce indexed CpG bedMethyl under `methylation/` and an integrated
+sample QC report under `qc/`, linked from the root HTML index. QC includes input
+yield, alignment, on/off-enrichment read lengths and coverage, target coverage,
+and CpG depth/beta distributions. Coverage is reported at both MAPQ ≥0 and ≥20.
+Use `--disable-qc true` to skip the new QC suite while retaining bedMethyl and
+Classy. See [QC definitions and large-BAM execution](documentation/qc.md).
 
 ## Setup
 

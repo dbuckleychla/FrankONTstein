@@ -264,3 +264,17 @@ python3 tests/run_contracts.py
 This exercises all tiers and resume using stubs and mock callers. It does not
 run the real analysis containers. Use `--skip-resume-check` only when deliberately
 checking routing without cache reuse.
+
+## CpG export and QC
+
+Every tier now exports CpG bedMethyl and runs QC by default. To retain CpG output
+and Classy while skipping comprehensive QC:
+
+```bash
+nextflow run ./main.nf -profile local,docker -params-file references.yaml \
+  --bam /data/sample.bam --sample_id sample --genome hg38 \
+  --primary --disable-qc true --outdir results -resume
+```
+
+See [QC outputs and metric definitions](qc.md) for on/off-enrichment coverage,
+read lengths, CpG summaries and large-BAM execution costs.

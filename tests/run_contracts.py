@@ -24,9 +24,9 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
                   '--reference_bundle','tests/fixtures/bundle.json','--targets_bed','tests/fixtures/regions.bed',
                   '--enrichment_bed','tests/fixtures/regions.bed','--image_manifest','tests/fixtures/images.json']
     for tier,extra,expected in [
-        ('primary',['--bam','tests/fixtures/stub.bam','--sample_id','sample1'],2),
-        ('secondary',['--input','tests/fixtures/input.csv','--demux_samplesheet','tests/fixtures/demux.csv','--trim'],6),
-        ('tertiary',['--bam','tests/fixtures/stub.bam','--sample_id','sample1'],13)]:
+        ('primary',['--bam','tests/fixtures/stub.bam','--sample_id','sample1'],4),
+        ('secondary',['--input','tests/fixtures/input.csv','--demux_samplesheet','tests/fixtures/demux.csv','--trim'],10),
+        ('tertiary',['--bam','tests/fixtures/stub.bam','--sample_id','sample1'],15)]:
         out=scratch/tier
         args=base+['--'+tier,'--outdir',str(out),'-work-dir',str(scratch/'work'),*extra]
         if tier == 'primary':
@@ -40,6 +40,8 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
         subprocess.run(args,cwd=root,env=env,check=True)
         result=json.loads((out/'manifest.json').read_text())
         assert result['run']['stub'] is True
+        assert len(result.get('qc', [])) == (2 if tier == 'secondary' else 1)
+        assert '/qc/index.html' in (out/'index.html').read_text()
         assert len(result['analyses']) == expected, result['analyses']
         assert all(r['status']=='completed' for r in result['analyses'])
         for record in result['analyses']:
@@ -52,6 +54,12 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
                 assert not (out/sample/analysis/analysis).exists()
                 expected_file = {'nasvar': f'{sample}.result.json', 'ichorcna': 'cnv.pdf', 'subchrom': 'cnv.png'}[analysis]
                 assert f'{sample}/{analysis}/{expected_file}' in record['files'], record
+            if record['analysis'] == 'qc':
+                assert (out/sample/'qc/index.html').exists()
+                assert not (out/sample/'qc/qc').exists()
+            if record['analysis'] == 'bedmethyl':
+                assert (out/sample/'methylation'/f'{sample}.cpg.bedmethyl.gz').exists()
+                assert (out/sample/'methylation'/f'{sample}.cpg.bedmethyl.gz.tbi').exists()
             if record['analysis'] == 'methylation':
                 sample = record['sample']
                 assert record['files'] == [f'{sample}/methylation/classy'], record
@@ -75,4 +83,16 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
         with (out/'pipeline_info/trace.tsv').open() as handle:
             statuses={r['status'] for r in csv.DictReader(handle,delimiter='\t') if not r['name'].endswith('RESULTS_INDEX')}
         assert statuses == {'CACHED'}, statuses
+    # QC disabled still produces Classy and bedMethyl, with an explicit skipped record.
+    out = scratch/'qc-disabled'
+    args = base + ['--primary','--bam','tests/fixtures/stub.bam','--sample_id','sample1',
+                   '--disable-qc','true','--outdir',str(out),'-work-dir',str(scratch/'disabled-work')]
+    subprocess.run(args,cwd=root,env=env,check=True)
+    data=json.loads((out/'manifest.json').read_text())
+    assert any(r['analysis']=='qc' and r['status']=='skipped' for r in data['analyses'])
+    assert not (out/'sample1/qc').exists()
+    assert data.get('qc') == []
+    with (out/'pipeline_info/trace.tsv').open() as handle:
+        assert not any('SAMPLE_QC' in r['name'] for r in csv.DictReader(handle, delimiter='\t'))
+    assert (out/'sample1/methylation/sample1.cpg.bedmethyl.gz').exists()
 print('All three tier routing contracts passed (stub/mock tools only)' if a.skip_resume_check else 'All three tiers and resume contracts passed (stub/mock tools only)')

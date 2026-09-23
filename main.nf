@@ -21,6 +21,7 @@ Required: --bam FILE --sample_id ID OR --input manifest.csv
 Tier:     --primary (default), --secondary, or --tertiary
 Optional: --demux_samplesheet demux.csv --trim --sequencing_kit KIT_NAME
           --callers nasvar,sniffles --basecall_model sup|hac|fast
+QC:       --disable-qc true skips comprehensive QC, retaining CpG bedMethyl.
 Trimming requires --sequencing_kit or the demux sheet's kit column.
 Profiles: -profile local,docker | slurm,apptainer | aws
 '''
@@ -82,8 +83,9 @@ Profiles: -profile local,docker | slurm,apptainer | aws
         }
 
         def provenance = [plan:plan, bundle:bundle, images:imageLock, dependencies:WorkflowPlan.readJson(file("${projectDir}/dependencies.json")), nextflow:nextflow.version.toString(), command:workflow.commandLine, session_id:workflow.sessionId.toString(), stub:workflow.stubRun]
-        def parameterNames = ['bam','sample_id','input','demux_samplesheet','trim','sequencing_kit','genome','reference_bundle','targets_bed','enrichment_bed','callers','max_cpus','max_memory','max_time','qdnaseq_binsize','delly_bin_size','ichor_bin_size','clair3_gpu','basecall_model']
+        def parameterNames = ['bam','sample_id','input','demux_samplesheet','trim','sequencing_kit','genome','reference_bundle','targets_bed','enrichment_bed','callers','max_cpus','max_memory','max_time','qdnaseq_binsize','delly_bin_size','ichor_bin_size','clair3_gpu','basecall_model','disable_qc']
         provenance.parameters = parameterNames.collectEntries { key -> [(key):params[key]] }
+        provenance.parameters.disable_qc = WorkflowPlan.qcDisabled(params as Map)
         runState.provenance = provenance
         PRIMARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, runState)
         artifacts = PRIMARY.out.results
@@ -97,6 +99,6 @@ Profiles: -profile local,docker | slurm,apptainer | aws
             artifacts = artifacts.mix(TERTIARY.out.results)
             versions = versions.mix(TERTIARY.out.software)
         }
-        REPORTING(PRIMARY.out.bam, artifacts, versions, plan, provenance, runState)
+        REPORTING(PRIMARY.out.bam, artifacts, versions, plan, provenance, runState, PRIMARY.out.qc_metrics)
     }
 }

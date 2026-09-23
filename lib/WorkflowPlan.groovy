@@ -42,12 +42,20 @@ class WorkflowPlan {
         if (!result) throw new IllegalArgumentException('Genome must be hg38/GRCh38 or hs1/CHM13')
         result
     }
+    static boolean qcDisabled(Map p) {
+        def value = p.containsKey('disableQc') ? p.disableQc : (p.containsKey('disable-qc') ? p['disable-qc'] : (p.disable_qc ?: false))
+        if (value instanceof Boolean) return value
+        if (value instanceof String && value in ['true','false']) return value.toBoolean()
+        throw new IllegalArgumentException('--disable-qc must be true or false')
+    }
+
     static Map resolve(Map p, Map bundle) {
         p = new LinkedHashMap(p)
-        ['primary','secondary','tertiary','trim'].each { key ->
+        p.disable_qc = qcDisabled(p)
+        ['primary','secondary','tertiary','trim','disable_qc'].each { key ->
             if (p[key] instanceof String && p[key] in ['true','false']) p[key] = p[key].toBoolean()
         }
-        ['primary','secondary','tertiary','trim'].each { key ->
+        ['primary','secondary','tertiary','trim','disable_qc'].each { key ->
             if (p[key] != null && !(p[key] instanceof Boolean)) throw new IllegalArgumentException("${key} must be boolean")
         }
         if (p.trim == true && !p.demux_samplesheet && !p.sequencing_kit?.toString()?.trim())
@@ -69,6 +77,7 @@ class WorkflowPlan {
             if (explicit && incompatible.contains(it)) throw new IllegalArgumentException("Caller ${it} does not support ${build}")
         }
         def skipped = requested.findAll { incompatible.contains(it) }.collect { [caller:it, reason:"unsupported reference ${build}"] }
+        if (p.disable_qc == true) skipped += [caller:'qc', reason:'disabled by --disable_qc']
         def selected = requested - incompatible
         // SubChrom consumes germline allele frequencies from Clair3.
         if (selected.contains('subchrom') && !selected.contains('clair3')) selected += 'clair3'

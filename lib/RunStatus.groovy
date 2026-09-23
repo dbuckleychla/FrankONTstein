@@ -9,12 +9,16 @@ class RunStatus {
             runState.error = taskFault?.error?.message ?: runState.error
             def summaryTrace = 'name\tstatus\n' + runState.completed.collect { item -> "PUBLISH_ARTIFACT (${item.sample}:${item.analysis})\tCOMPLETED\n" }.join('')
             if (runState.failureTask) summaryTrace += "${runState.failureTask}\tFAILED\n"
-            def analyses = RunStatus.summarize(runState.samples, runState.provenance.plan?.callers ?: [], summaryTrace)
+            def analyses = RunStatus.summarize(runState.samples, (runState.provenance.plan?.callers ?: []) + ['bedmethyl','qc'], summaryTrace)
+            analyses.each { row ->
+                row.files = runState.completed.findAll { it.sample == row.sample && it.analysis == row.analysis }.collectMany { it.files ?: [] }.unique()
+                if (row.analysis == 'qc' && runState.provenance.parameters?.disable_qc?.toString() == 'true') row.status = 'skipped'
+            }
             outputDir.resolve('manifest.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
                 run:runState.provenance, status:'failed', error:runState.error ?: workflow.errorMessage, analyses:analyses,
                 task_statuses:'pipeline_info/trace.tsv'
             ]))
-            outputDir.resolve('index.html').text = '<!doctype html><meta charset="utf-8"><title>FrankONTstein failed run</title><h1>Run failed</h1><p>See <a href="manifest.json">manifest.json</a> for analysis statuses and <a href="pipeline_info/trace.tsv">trace.tsv</a> for task details. Completed artifacts may be present.</p>'
+            outputDir.resolve('index.html').text = '<!doctype html><meta charset="utf-8"><title>FrankONTstein failed run</title><h1>Run failed</h1><p>See <a href="manifest.json">manifest.json</a> for analysis statuses and <a href="pipeline_info/trace.tsv">trace.tsv</a> for task details. Completed artifacts may be present.</p>' + analyses.findAll { it.files }.collect { row -> '<p>' + row.files.collect { path -> '<a href="' + path.replace('&','&amp;').replace('"','&quot;').replace('<','&lt;') + '">' + path.replace('&','&amp;').replace('<','&lt;') + '</a>' }.join(' ') + '</p>' }.join('')
         }
         info.resolve('status.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
             status:workflow.success ? 'completed' : 'failed', exit_status:workflow.exitStatus,
@@ -23,7 +27,7 @@ class RunStatus {
     }
 
     static List summarize(List samples, List callers, String trace) {
-        def aliases = [ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
+        def aliases = [MODKIT_PILEUP:'bedmethyl', INDEX_BEDMETHYL:'bedmethyl', SAMPLE_QC:'qc', ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
             CLAIRS_TO_CALL:'clairsto', BCFTOOLS_MPILEUP:'bcftools', BCFTOOLS_CALL:'bcftools',
             SNIFFLES_CALL:'sniffles', SEVERUS_TUMOR_UNPHASED:'severus', STELLERATOR:'stellerator',
             QDNASEQ_CALL:'qdnaseq', DELLY:'delly', SUBCHROM:'subchrom', ICHORCNA:'ichorcna']

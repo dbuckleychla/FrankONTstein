@@ -32,7 +32,7 @@ def validate_batch(records):
 def check(path, unaligned=False, threads=1):
     if threads < 1:
         raise ValueError('threads must be at least 1')
-    reads = modified = 0
+    reads = modified = bases = 0
     groups = set()
     # One reader plus N-1 decoding workers; no index or temporary BAMs needed.
     # Spawn avoids inheriting HTSlib handles across a fork.
@@ -47,6 +47,7 @@ def check(path, unaligned=False, threads=1):
             header_groups = {rg['ID'] for rg in bam.header.to_dict().get('RG', [])}
             for read in bam.fetch(until_eof=True):
                 reads += 1
+                bases += read.query_length or 0
                 if unaligned and not read.is_unmapped:
                     raise ValueError(f'{path}: expected unaligned BAM')
                 if read.has_tag('RG'):
@@ -83,7 +84,7 @@ def check(path, unaligned=False, threads=1):
         raise ValueError(f'{path}: no reads with methylation tags; Classy requires modified-base calls')
     if groups - header_groups:
         raise ValueError(f'{path}: read groups missing from header: {groups - header_groups}')
-    return {'reads': reads, 'modified_reads': modified, 'read_groups': sorted(groups)}
+    return {'reads': reads, 'bases': bases, 'modified_reads': modified, 'read_groups': sorted(groups)}
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

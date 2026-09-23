@@ -57,6 +57,7 @@ process TRIM_BAM {
     tuple val(meta), path(bam)
     output:
     tuple val(meta), path('trimmed.bam'), emit: bam
+    tuple val(meta), path('trim_qc.json'), emit: qc
     path 'trim.versions.yml', emit: versions
     script:
     if (!meta.kit) error 'Dorado trimming requires a sequencing kit in sample metadata'
@@ -69,6 +70,7 @@ process TRIM_BAM {
     stub:
     """
     touch trimmed.bam
+    echo '{"stub":true}' > trim_qc.json
     echo 'dorado: stub' > trim.versions.yml
     """
 
