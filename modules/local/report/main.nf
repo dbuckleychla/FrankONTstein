@@ -7,9 +7,11 @@ process PUBLISH_ARTIFACT {
     output:
     tuple val(meta), val(analysis), path('artifacts/*'), emit: results
     script:
+    // These callers emit a wrapper directory; publish its contents under the analysis.
+    def source = analysis in ['nasvar', 'ichorcna', 'subchrom'] ? 'source/*/.' : 'source/*'
     """
     mkdir artifacts
-    cp -RL source/* artifacts/
+    cp -RL ${source} artifacts/
     """
 }
 process RESULTS_INDEX {

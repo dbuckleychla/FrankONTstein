@@ -28,7 +28,7 @@ process PREPARE_BAM {
 process DEMULTIPLEX {
     tag "${meta.id}"
     container { params.images.preprocess }
-    publishDir { "${params.outdir}/demultiplex/${meta.id}" }, mode: 'copy', pattern: 'demux/*'
+    publishDir { "${params.outdir}/demultiplex/${meta.id}" }, mode: 'copy', pattern: 'demux/*', saveAs: { name -> name.replaceFirst('demux/', '') }
     input:
     tuple val(meta), path(bam)
     output:
@@ -85,6 +85,7 @@ process ALIGN {
     output:
     tuple val(meta), path("${meta.id}.bam"), path("${meta.id}.bam.bai"), emit: bam
     tuple val(meta), path("${meta.id}.qc.json"), emit: qc
+    path "${meta.id}.flagstat.txt", emit: flagstat
     path 'alignment.versions.yml', emit: versions
     script:
     """
@@ -98,6 +99,7 @@ process ALIGN {
     stub:
     """
     touch '${meta.id}.bam' '${meta.id}.bam.bai'
+    touch '${meta.id}.flagstat.txt'
     echo '{"stub":true}' > '${meta.id}.qc.json'
     echo 'dorado: stub' > alignment.versions.yml
     """
