@@ -49,3 +49,4 @@ jobs:
       - run: terraform -chdir=terraform/aws fmt -check
       - run: terraform -chdir=terraform/aws init -backend=false -input=false
       - run: terraform -chdir=terraform/aws validate
+      - run: terraform -chdir=terraform/aws test

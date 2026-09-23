@@ -6,7 +6,9 @@ spot      = false
 # Optional existing network, with outbound connectivity for images and assets:
 # vpc_id = "vpc-..."
 # subnet_ids = ["subnet-...", "subnet-..."]
-# Optional existing bucket; tasks write only work/ and results/ prefixes:
-# bucket_name = "your-existing-bucket"
+# Required existing bucket; bucket settings are never changed.
+bucket_name = "your-existing-bucket"
+# All work/results writes are scoped beneath this prefix.
+s3_prefix = "frankONTstein/"
 # read_bucket_arns = ["arn:aws:s3:::your-input-bucket"]
 # permissions_boundary_arn = "arn:aws:iam::<account>:policy/<boundary>"

@@ -1,45 +1,35 @@
+# Read-only lookup: storage is always supplied and managed by the bucket owner.
+data "aws_s3_bucket" "existing" {
+  bucket = var.bucket_name
+}
+
 locals {
-  bucket_name = var.bucket_name != null ? var.bucket_name : "${var.name}-${data.aws_caller_identity.current.account_id}-${var.region}"
-  bucket_arn  = "arn:${data.aws_partition.current.partition}:s3:::${local.bucket_name}"
+  bucket_name    = data.aws_s3_bucket.existing.id
+  bucket_arn     = data.aws_s3_bucket.existing.arn
+  s3_prefix      = trimsuffix(var.s3_prefix, "/")
+  work_prefix    = "${local.s3_prefix}/work"
+  results_prefix = "${local.s3_prefix}/results"
 }
-resource "aws_s3_bucket" "this" {
-  count         = var.bucket_name == null ? 1 : 0
-  bucket        = local.bucket_name
-  force_destroy = false
-  lifecycle { prevent_destroy = true }
+
+# Upgrade safety: forget buckets/settings managed by older releases without
+# deleting the bucket or changing any of its settings. Keep these migration blocks.
+removed {
+  from = aws_s3_bucket.this
+  lifecycle { destroy = false }
 }
-resource "aws_s3_bucket_public_access_block" "this" {
-  count                   = var.bucket_name == null ? 1 : 0
-  bucket                  = aws_s3_bucket.this[0].id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+removed {
+  from = aws_s3_bucket_public_access_block.this
+  lifecycle { destroy = false }
 }
-resource "aws_s3_bucket_versioning" "this" {
-  count  = var.bucket_name == null ? 1 : 0
-  bucket = aws_s3_bucket.this[0].id
-  versioning_configuration { status = "Enabled" }
+removed {
+  from = aws_s3_bucket_versioning.this
+  lifecycle { destroy = false }
 }
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  count  = var.bucket_name == null ? 1 : 0
-  bucket = aws_s3_bucket.this[0].id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm     = var.kms_key_arn == null ? "AES256" : "aws:kms"
-      kms_master_key_id = var.kms_key_arn
-    }
-  }
+removed {
+  from = aws_s3_bucket_server_side_encryption_configuration.this
+  lifecycle { destroy = false }
 }
-resource "aws_s3_bucket_policy" "tls" {
-  count  = var.bucket_name == null ? 1 : 0
-  bucket = aws_s3_bucket.this[0].id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Deny", Principal = "*", Action = "s3:*"
-      Resource  = [local.bucket_arn, "${local.bucket_arn}/*"]
-      Condition = { Bool = { "aws:SecureTransport" = "false" } }
-    }]
-  })
+removed {
+  from = aws_s3_bucket_policy.tls
+  lifecycle { destroy = false }
 }

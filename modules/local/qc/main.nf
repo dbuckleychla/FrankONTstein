@@ -11,7 +11,7 @@ process MODKIT_PILEUP {
     script:
     """
     modkit pileup '${bam}' '${meta.id}.cpg.bedmethyl.gz' --ref '${fasta}' \
-      --cpg --combine-strands --bgzf --threads ${task.cpus} \
+      --cpg --modified-bases m h --combine-strands --bgzf --threads ${task.cpus} \
       --log-filepath '${meta.id}.modkit.log'
     modkit --version > modkit.versions.yml
     """

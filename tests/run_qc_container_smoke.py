@@ -35,7 +35,7 @@ with pysam.AlignmentFile('sample.bam','wb',header={'HD':{'SO':'coordinate'},'SQ'
         bam.write(r)
 pysam.index('sample.bam')
 PYTHON''')
-    run(images['classy'], f'''modkit pileup sample.bam sample.cpg.bedmethyl.gz --ref reference.fa --cpg --combine-strands --bgzf --threads {a.threads} --log-filepath modkit.log''')
+    run(images['classy'], f'''modkit pileup sample.bam sample.cpg.bedmethyl.gz --ref reference.fa --cpg --modified-bases m h --combine-strands --bgzf --threads {a.threads} --log-filepath modkit.log''')
     run(images['preprocess'], f'''python3 -c "import pysam; pysam.tabix_index('sample.cpg.bedmethyl.gz',preset='bed',force=True)"
 /workflow/bin/adaptive_qc.py --sample smoke --bam sample.bam --fasta reference.fa --enrichment enrichment.bed --targets targets.bed --bedmethyl sample.cpg.bedmethyl.gz --threads {a.threads}''')
     data=json.loads((Path(tmp)/'qc/metrics.json').read_text())

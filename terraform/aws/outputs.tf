@@ -6,10 +6,10 @@ output "nextflow_params" {
     aws_job_role   = aws_iam_role.task.arn
     aws_logs_group = aws_cloudwatch_log_group.batch.name
     aws_cli_path   = "/opt/aws-cli/v2/current/bin/aws"
-    outdir         = "s3://${local.bucket_name}/results"
+    outdir         = "s3://${local.bucket_name}/${local.results_prefix}"
   }
 }
-output "work_dir" { value = "s3://${local.bucket_name}/work" }
+output "work_dir" { value = "s3://${local.bucket_name}/${local.work_prefix}" }
 output "coordinator_policy_arn" { value = aws_iam_policy.coordinator.arn }
 output "vpc_id" { value = local.vpc_id }
 output "subnet_ids" { value = local.subnets }

@@ -85,6 +85,6 @@ shared pileup for classification requires independent compatibility validation.
 
 `MODKIT_PILEUP` reuses the locked Classy image; the other new tasks reuse the
 preprocessing image. No new image key or reference asset is required. The locked
-modkit must support `--cpg --combine-strands --bgzf --log-filepath`. Actual modkit
+modkit must support `--cpg --modified-bases m h --combine-strands --bgzf --log-filepath`. Actual modkit
 and container execution must be verified on a supported Linux host; stub runs
 exercise wiring, not biological calculations.

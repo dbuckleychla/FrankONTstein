@@ -245,8 +245,8 @@ nextflow run . \
   --aws_region YOUR_REGION \
   --aws_queue YOUR_BATCH_QUEUE \
   --aws_job_role arn:aws:iam::YOUR_ACCOUNT_ID:role/YOUR_JOB_ROLE \
-  --outdir s3://YOUR_OUTPUT_BUCKET/results/BC3_secondary \
-  -work-dir s3://YOUR_OUTPUT_BUCKET/work/BC3_secondary
+  --outdir s3://YOUR_OUTPUT_BUCKET/frankONTstein/results/BC3_secondary \
+  -work-dir s3://YOUR_OUTPUT_BUCKET/frankONTstein/work/BC3_secondary
 ```
 
 Run the coordinator on a persistent host; retain its launch/cache state for

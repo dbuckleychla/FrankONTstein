@@ -29,10 +29,10 @@ flowchart TB
     end
 
     REG["Public OCI registries<br/>GHCR and other configured image sources"]
-    S3["Existing or Terraform-managed S3 bucket<br/>work/ and results/"]
+    S3["Required existing S3 bucket<br/>frankONTstein/work/ and frankONTstein/results/"]
     READ["Optional additional read-only S3 buckets<br/>Inputs and reference assets"]
     LOGS["CloudWatch Logs<br/>Configured retention"]
-    ROLE["Task IAM role<br/>Read configured buckets<br/>Write work/ and results/"]
+    ROLE["Task IAM role<br/>Read configured buckets<br/>Write configured work/results prefixes"]
     KMS["Optional existing KMS keys"]
     INFRAIAM["Batch service role + EC2 instance profile<br/>Optional Spot fleet role"]
 
@@ -61,7 +61,6 @@ flowchart TB
     COORD --> READ
     TASKS --> LOGS
     COORD -->|Read task logs| LOGS
-    KMS -.-> S3
     KMS -.-> ROLE
 ```
 
@@ -74,13 +73,14 @@ flowchart TB
 - **Existing VPC:** supply `vpc_id` and `subnet_ids`. Terraform creates the Batch
   security group but does not create NAT, routes or endpoints. The supplied
   network must provide outbound access to registries and required AWS services.
-- **Managed bucket:** versioning, public-access blocking, TLS-only access and
-  server-side encryption are configured. An existing KMS key can replace the
-  default S3 encryption. `prevent_destroy` and `force_destroy = false` protect
-  the bucket; an ordinary destroy will be blocked rather than erase its data.
-- **Existing bucket:** its encryption, retention and access configuration remain
-  the owner's responsibility. Task writes are scoped to `work/` and `results/`;
-  additional input buckets can be granted read access.
+- **Existing bucket required:** Terraform only looks it up; it never creates,
+  deletes or changes bucket settings. Encryption, policies, versioning, lifecycle
+  and retention stay with the bucket owner. The default `s3_prefix` is
+  `frankONTstein/`; writes/cleanup are limited to its `work/` and `results/`
+  paths. Additional input buckets can be granted read access.
+- **Upgrades:** migration blocks forget old managed bucket/settings resources
+  without changing AWS. Apply the reviewed migration before teardown; see the
+  [AWS guide](../docs/aws.md#upgrading-an-existing-terraform-state).
 
 The GPU queue exists only when `gpu_instance_types` is configured. CPU Spot is
 optional; the GPU environment remains on-demand. Both environments can scale to

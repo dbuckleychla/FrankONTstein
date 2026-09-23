@@ -27,7 +27,7 @@ data "aws_iam_policy_document" "data" {
   }
   statement {
     actions   = ["s3:PutObject", "s3:AbortMultipartUpload", "s3:DeleteObject"]
-    resources = ["${local.bucket_arn}/work/*", "${local.bucket_arn}/results/*"]
+    resources = ["${local.bucket_arn}/${local.work_prefix}/*", "${local.bucket_arn}/${local.results_prefix}/*"]
   }
   dynamic "statement" {
     for_each = length(local.keys) > 0 ? [1] : []

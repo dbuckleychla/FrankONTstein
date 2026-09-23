@@ -33,8 +33,22 @@ variable "vpc_cidr" {
 }
 variable "bucket_name" {
   type        = string
-  default     = null
-  description = "Existing work/results bucket; null creates an account/region-qualified bucket."
+  nullable    = false
+  description = "Required existing S3 bucket name. Terraform never creates, deletes or configures this bucket."
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.bucket_name))
+    error_message = "Supply an existing S3 bucket name, not an ARN, URL or path."
+  }
+}
+variable "s3_prefix" {
+  type        = string
+  default     = "frankONTstein/"
+  nullable    = false
+  description = "Nonempty relative prefix containing work/ and results/; optional trailing slash."
+  validation {
+    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9._/-]*/?$", var.s3_prefix)) && alltrue([for part in split("/", trimsuffix(var.s3_prefix, "/")) : !contains(["", ".", ".."], part)])
+    error_message = "Use a nonempty relative S3 prefix without empty, dot or parent-directory components."
+  }
 }
 variable "read_bucket_arns" {
   type        = list(string)
@@ -44,7 +58,7 @@ variable "read_bucket_arns" {
 variable "kms_key_arn" {
   type        = string
   default     = null
-  description = "Optional customer-managed key for the managed S3 bucket."
+  description = "Optional existing key used by the supplied S3 bucket. Grants task/coordinator KMS access only; does not configure encryption."
 }
 variable "read_kms_key_arns" {
   type    = list(string)
