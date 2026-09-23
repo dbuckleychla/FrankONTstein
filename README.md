@@ -147,7 +147,9 @@ Prepare a local image lock and a reference bundle using [the container guide](do
 ## Run
 
 See [run examples](documentation/run-examples.md) for all tiers, trimming,
-demultiplexing, batches, resume, Slurm and AWS commands.
+demultiplexing, batches, resume, Slurm and AWS commands. See the
+[AWS Terraform architecture](documentation/terraform-architecture.md) for the
+Batch, networking, storage and coordinator diagram.
 
 For a reusable reference configuration, copy `assets/references.example.yaml` to
 `references.yaml` and
