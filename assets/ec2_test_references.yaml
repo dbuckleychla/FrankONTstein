@@ -11,6 +11,8 @@ enrichment_bed: /home/ec2-user/references/hg38/targets/DARGAN_OCCRA_ALMA_CHLA_wi
 # Container digest lock from GitHub Actions.
 image_manifest: images.lock.json
 # Assets must match --genome; see docs/reference-sources.md.
+# Basecaller accuracy: sup, hac or fast; selects bundled Clair3 weights.
+basecall_model: sup
 steps:
 
   # Pediatric leukemia configs selected automatically by genome.
@@ -21,10 +23,6 @@ steps:
     sites: /home/ec2-user/references/hg38/nasvar/maf_sites_all.tsv
     # GFF3: verify gene Name attributes and NASVAR-config transcript IDs.
     gff: /home/ec2-user/references/hg38/nasvar/GCF_000001405.40_GRCh38.p14_genomic.gff
-
-  clair3:
-    # Clair3 model directory matching chemistry/basecalling.
-    model: /home/ec2-user/references/rerio/clair3_models/r1041_e82_400bps_sup_v520
 
   clairsto:
     # ClairS-TO model identifier (not a path).

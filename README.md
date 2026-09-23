@@ -49,7 +49,7 @@ For a reusable reference configuration, copy `assets/references.example.yaml` to
 replace the example paths. Supply `--bam`, `--genome`, and `--sample_id` on the
 command line. Shared reference inputs (`fasta`, `targets_bed`, `enrichment_bed`)
 are top-level parameters in the file; analysis-specific assets live under
-`steps.nasvar`, `steps.clair3`, etc. Launch with:
+`steps.nasvar`, `steps.clairsto`, etc. Launch with:
 
 ```bash
 nextflow run . -profile local,docker -params-file references.yaml \
@@ -163,3 +163,5 @@ See [AGENTS.md](AGENTS.md) for module interfaces and dependency-update rules. Ad
 ## License
 
 Original workflow code is MIT. **NASVAR is non-commercial**, including when redistributed in a container; its full notice is retained in `licenses/NASVAR.txt`. Upstream modules, tools, models and reference assets retain their own terms. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Clair3 uses bundled models selected by `--basecall_model sup|hac|fast` (default `sup`), also configurable as `basecall_model: sup` in the params YAML. Following oncoseq, SUP selects `/opt/models/r1041_e82_400bps_sup_v500`; HAC and FAST select `/opt/models/r1041_e82_400bps_hac_v500`. These assume R10.4.1 E8.2, 400 bps data. No external model path is required; old `steps.clair3.model` entries are ignored.

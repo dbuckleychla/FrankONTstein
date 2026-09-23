@@ -20,7 +20,7 @@ Required: --bam FILE --sample_id ID OR --input manifest.csv
           --enrichment_bed enrichment.bed --image_manifest images.json
 Tier:     --primary (default), --secondary, or --tertiary
 Optional: --demux_samplesheet demux.csv --trim --sequencing_kit KIT_NAME
-          --callers nasvar,sniffles
+          --callers nasvar,sniffles --basecall_model sup|hac|fast
 Trimming requires --sequencing_kit or the demux sheet's kit column.
 Profiles: -profile local,docker | slurm,apptainer | aws
 '''
@@ -57,7 +57,6 @@ Profiles: -profile local,docker | slurm,apptainer | aws
             assets[name] = plan.callers.contains('nasvar') ? assetPath.call(bundle.nasvar?.get(name)) : []
         }
         def resources = [:]
-        if (plan.callers.contains('clair3')) resources.clair3_model = assetPath.call(bundle.models?.clair3)
         if (plan.callers.contains('clairsto')) {
             resources.clairsto_model = bundle.models?.clairsto
             WorkflowPlan.identifier(resources.clairsto_model as String)
@@ -83,7 +82,7 @@ Profiles: -profile local,docker | slurm,apptainer | aws
         }
 
         def provenance = [plan:plan, bundle:bundle, images:imageLock, dependencies:WorkflowPlan.readJson(file("${projectDir}/dependencies.json")), nextflow:nextflow.version.toString(), command:workflow.commandLine, session_id:workflow.sessionId.toString(), stub:workflow.stubRun]
-        def parameterNames = ['bam','sample_id','input','demux_samplesheet','trim','sequencing_kit','genome','reference_bundle','targets_bed','enrichment_bed','callers','max_cpus','max_memory','max_time','qdnaseq_binsize','delly_bin_size','ichor_bin_size','clair3_gpu']
+        def parameterNames = ['bam','sample_id','input','demux_samplesheet','trim','sequencing_kit','genome','reference_bundle','targets_bed','enrichment_bed','callers','max_cpus','max_memory','max_time','qdnaseq_binsize','delly_bin_size','ichor_bin_size','clair3_gpu','basecall_model']
         provenance.parameters = parameterNames.collectEntries { key -> [(key):params[key]] }
         runState.provenance = provenance
         PRIMARY(samples, Channel.value(tuple(fasta,fai)), assets, plan, runState)

@@ -62,3 +62,9 @@ assert planner.resolve([trim:true,sequencing_kit:'SQK-LSK114'], hg38).tier == 'p
 assert planner.resolve([trim:true,demux_samplesheet:'demux.csv'], hg38).tier == 'primary'
 rejects { planner.samples(rows, [[sample:'s2',run:'r1',kit:'',barcode:'barcode01']], true) }
 println '7 trimming kit preflight assertions passed'
+
+assert planner.clair3Model(null) == '/opt/models/r1041_e82_400bps_sup_v500'
+assert planner.clair3Model('sup') == '/opt/models/r1041_e82_400bps_sup_v500'
+assert planner.clair3Model('hac') == '/opt/models/r1041_e82_400bps_hac_v500'
+assert planner.clair3Model('fast') == '/opt/models/r1041_e82_400bps_hac_v500'
+try { planner.clair3Model('typo'); assert false } catch (IllegalArgumentException expected) { }

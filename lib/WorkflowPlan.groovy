@@ -1,6 +1,13 @@
 import groovy.json.JsonSlurper
 
 class WorkflowPlan {
+    static String clair3Model(Object value) {
+        def mode = (value ?: 'sup').toString()
+        if (!(mode in ['sup', 'hac', 'fast']))
+            throw new IllegalArgumentException('--basecall_model must be sup, hac or fast')
+        return "/opt/models/r1041_e82_400bps_${mode == 'sup' ? 'sup' : 'hac'}_v500"
+    }
+
     static Map reference(Map p, Map legacy, String projectDir) {
         if (legacy && (p.fasta || p.fai || p.steps))
             throw new IllegalArgumentException('Use reference_bundle or shared fasta/fai/steps, not both')
@@ -11,13 +18,15 @@ class WorkflowPlan {
         def steps = p.steps ?: [:]
         b.nasvar = new LinkedHashMap(legacy ? (legacy.nasvar ?: [:]) : (steps.nasvar ?: [:]))
         if (!legacy) {
-            b.models = [clair3:steps.clair3?.model, clairsto:steps.clairsto?.model]
+            b.models = [clairsto:steps.clairsto?.model]
             b.callers = [fusion_list:steps.stellerator?.fusion_list, delly_map:steps.delly?.map,
                 subchrom_panel:steps.subchrom?.panel]
             ['gc','map','centromeres','panel','seqinfo'].each { key ->
                 b.callers["ichor_${key}"] = steps.ichorcna?.get(key)
             }
         }
+        b.models = new LinkedHashMap(b.models ?: [:])
+        b.models.clair3 = clair3Model(p.basecall_model)
         def build = genome(b.genome)
         def dir = "${projectDir}/vendor/nasvar/config"
         if (!b.nasvar.reference) b.nasvar.reference = "${dir}/${build == 'hg38' ? 'GRCh38_reference.json' : 'T2T-CHM13v2.0_reference.json'}"

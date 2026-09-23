@@ -28,14 +28,16 @@ process CLAIR3 {
     tuple val(meta), path(bam), path(bai)
     tuple path(fasta), path(fai), val(validated)
     path assets
-    path model
     output:
     tuple val(meta), path('clair3/merge_output.vcf.gz'), emit: vcf
     path 'versions.yml', emit: versions
     script:
+    def model = WorkflowPlan.clair3Model(params.basecall_model)
     """
+    test -s ${model}/pileup.pt || { echo 'Clair3 image is missing the bundled ${params.basecall_model} pileup model' >&2; exit 1; }
+    test -s ${model}/full_alignment.pt || { echo 'Clair3 image is missing the bundled ${params.basecall_model} full-alignment model' >&2; exit 1; }
     run_clair3.sh --threads=${task.cpus} --sample_name='${meta.id}' \
-      --platform=ont --model_path='${model}' --bam_fn='${bam}' --ref_fn='${fasta}' \
+      --platform=ont --model_path=${model} --bam_fn='${bam}' --ref_fn='${fasta}' \
       --bed_fn='${assets}/enrichment.bed' --output=clair3 ${params.clair3_gpu.toString().toBoolean() ? '--use_gpu' : ''}
     run_clair3.sh --version > versions.yml 2>&1
     """

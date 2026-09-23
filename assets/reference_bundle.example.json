@@ -12,7 +12,6 @@
     "reference": "/references/hg38/reference.json"
   },
   "models": {
-    "clair3": "/references/models/clair3/r1041_e82_400bps_sup_v500",
     "clairsto": "ont_r10_dorado_sup_5khz_ssrs"
   },
   "callers": {

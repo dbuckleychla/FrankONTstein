@@ -88,7 +88,17 @@
     },
     "steps": {
       "type": "object",
-      "description": "Per-analysis assets: nasvar, clair3, clairsto, stellerator, delly, subchrom, ichorcna"
+      "description": "Per-analysis assets: nasvar, clairsto, stellerator, delly, subchrom, ichorcna"
+    },
+    "basecall_model": {
+      "type": "string",
+      "enum": [
+        "sup",
+        "hac",
+        "fast"
+      ],
+      "default": "sup",
+      "description": "Bundled Clair3 model selection: sup uses SUP v5.0; hac and fast use HAC v5.0."
     }
   },
   "required": [

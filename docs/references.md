@@ -43,7 +43,7 @@ requires nine tab-separated columns; spaces inside fields are preserved.
 | --- | --- |
 | All tiers | `fasta`, `fai`; Classy models and liftover assets within the locked Classy image |
 | NASVAR | `nasvar.repeats`, `sites`, `gff`, `config`, `reference` |
-| Clair3 | `models.clair3`: staged directory of model weights compatible with the basecaller chemistry/model |
+| Clair3 | Bundled models selected by `basecall_model: sup` (default), `hac` or `fast`. SUP uses SUP v5.0; HAC/FAST use HAC v5.0. No separate model download. |
 | ClairS-TO | `models.clairsto`: platform/model identifier supported by the locked image |
 | Stellerator | `callers.fusion_list`: Stellerator loci list; not the NASVAR target BED |
 | Delly | `callers.delly_map`: mappability map built for the exact assembly |

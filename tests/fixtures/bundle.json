@@ -12,7 +12,6 @@
     "reference": "config.json"
   },
   "models": {
-    "clair3": "config.json",
     "clairsto": "test_model"
   },
   "callers": {

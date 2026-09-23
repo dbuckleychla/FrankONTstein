@@ -11,6 +11,8 @@ enrichment_bed: /panels/enrichment.bed
 # Container digest lock from GitHub Actions.
 image_manifest: images.lock.json
 # Assets must match --genome; see docs/reference-sources.md.
+# Basecaller accuracy: sup, hac or fast; selects bundled Clair3 weights.
+basecall_model: sup
 steps:
 
   # Pediatric leukemia configs selected automatically by genome.
@@ -21,10 +23,6 @@ steps:
     sites: /references/hg38/sites.tsv
     # Gene/transcript annotation (GFF3).
     gff: /references/hg38/genes.gff3
-
-  clair3:
-    # Clair3 model directory matching chemistry/basecalling.
-    model: /references/models/clair3
 
   clairsto:
     # ClairS-TO model identifier (not a path).

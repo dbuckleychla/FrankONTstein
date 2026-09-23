@@ -25,7 +25,7 @@ workflow CALLING {
         versions = versions.mix(BCFTOOLS_MPILEUP.out.versions, BCFTOOLS_CALL.out.versions)
     }
     if (plan.callers.contains('clair3')) {
-        CLAIR3(bam, reference, assets, resources.clair3_model)
+        CLAIR3(bam, reference, assets)
         smallVariants = smallVariants.mix(CLAIR3.out.vcf.map { m,f -> tuple(m,'clair3','variants',f) })
         artifacts = artifacts.mix(CLAIR3.out.vcf.map { m,f -> tuple(m,'clair3',f) })
         versions = versions.mix(CLAIR3.out.versions)
