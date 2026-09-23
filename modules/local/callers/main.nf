@@ -87,7 +87,11 @@ process SUBCHROM {
     """
     mkdir -p '${meta.id}.panel.SubChrom'
     cp -L '${vcf}' '${meta.id}.panel.SubChrom/${meta.id}.panel.gatkHC.vcf.gz'
-    SubChrom.sh -s '${meta.id}' -i '${bam}' -d panel -r '${fasta}' -p '${panel_bin}' -md hg38
+    # SubChrom changes directory internally; resolve inputs before invoking it.
+    bam_path=\$(realpath '${bam}')
+    fasta_path=\$(realpath '${fasta}')
+    panel_path=\$(realpath '${panel_bin}')
+    SubChrom.sh -s '${meta.id}' -i "\$bam_path" -d panel -r "\$fasta_path" -p "\$panel_path" -md hg38
     SubChrom.sh --help > versions.yml 2>&1
     """
     stub:
