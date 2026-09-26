@@ -1,0 +1,12 @@
+GPU-b2b80140-7308-01c9-23e4-e05602bf95e6
+[2026-09-25 21:44:55.226] [info] Running: "basecaller" "models/base/dna_r10.4.1_e8.2_400bps_sup@v5.2.0" "pod5_inputs" "--modified-bases-models" "models/mod/dna_r10.4.1_e8.2_400bps_sup@v5.2.0_5mCG_5hmCG@v2" "--no-trim" "--device" "cuda:all"
+[2026-09-25 21:44:55.251] [info] > Creating basecall pipeline
+[2026-09-25 21:44:55.675] [info] Using CUDA devices:
+[2026-09-25 21:44:55.675] [info] cuda:0 - NVIDIA L4
+[2026-09-25 21:44:56.728] [info] Calculating optimized batch size for GPU "NVIDIA L4" and model dna_r10.4.1_e8.2_400bps_sup@v5.2.0. Full benchmarking will run for this device, which may take some time.
+[2026-09-25 21:45:00.648] [info] cuda:0 using chunk size 12288, batch size 32
+[2026-09-25 21:45:00.748] [info] cuda:0 using chunk size 6144, batch size 32
+[2026-09-25 21:51:37.479] [info] > Finished in (ms): 396632
+[2026-09-25 21:51:37.479] [info] > Simplex reads basecalled: 75000
+[2026-09-25 21:51:37.479] [info] > Basecalled @ Samples/s: 1.958183e+06
+[2026-09-25 21:51:37.483] [info] > Finished

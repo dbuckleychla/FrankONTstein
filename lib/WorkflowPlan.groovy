@@ -1,6 +1,12 @@
 import groovy.json.JsonSlurper
 
 class WorkflowPlan {
+    static void validateAws(Map params, java.nio.file.Path workDir) {
+        def missing = ['aws_queue', 'aws_region', 'aws_job_role'].findAll { !params[it] }.collect { "--${it}" }
+        if (workDir.toUri().scheme != 's3') missing.add('-work-dir s3://... (or FRANKONTSTEIN_WORK_DIR)')
+        if (missing) throw new IllegalArgumentException("AWS requires: ${missing.join(', ')}")
+    }
+
     static String clair3Model(Object value) {
         def mode = (value ?: 'sup').toString()
         if (!(mode in ['sup', 'hac', 'fast']))
@@ -9,7 +15,7 @@ class WorkflowPlan {
     }
 
     static Map reference(Map p, Map legacy, String projectDir) {
-        if (legacy && (p.fasta || p.fai || p.steps))
+        if (legacy && (p.fasta || p.fai || (p.steps ?: [:]).keySet().any { !(it in ['basecall', 'clair3']) }))
             throw new IllegalArgumentException('Use reference_bundle or shared fasta/fai/steps, not both')
         def b = legacy ? new LinkedHashMap(legacy) : [schema_version:1,
             id:p.reference_id ?: "${genome(p.genome)}-local", genome:genome(p.genome),
@@ -26,7 +32,13 @@ class WorkflowPlan {
             }
         }
         b.models = new LinkedHashMap(b.models ?: [:])
-        b.models.clair3 = clair3Model(p.basecall_model)
+        if (steps.clair3?.model) {
+            def name = steps.clair3.model.toString().tokenize('/').last()
+            def mode = (p.basecall_model ?: 'sup').toString()
+            if (!(mode in ['sup', 'hac']) || !(name ==~ /r1041_e82_400bps_${mode}_v[0-9]+_with_mv/))
+                throw new IllegalArgumentException('steps.clair3.model must be a canonical SUP/HAC with_mv model matching --basecall_model')
+        }
+        b.models.clair3 = steps.clair3?.model ?: clair3Model(p.basecall_model)
         def build = genome(b.genome)
         def dir = "${projectDir}/vendor/nasvar/config"
         if (!b.nasvar.reference) b.nasvar.reference = "${dir}/${build == 'hg38' ? 'GRCh38_reference.json' : 'T2T-CHM13v2.0_reference.json'}"
@@ -87,6 +99,20 @@ class WorkflowPlan {
         if (!value || !(value ==~ /[A-Za-z0-9][A-Za-z0-9_.-]*/))
             throw new IllegalArgumentException("Unsafe or empty identifier: ${value}")
     }
+    /** Normalize the sequencer export at the input boundary; optional columns do not route reads. */
+    static List demuxRows(List rows) {
+        if (!rows) throw new IllegalArgumentException('Demux sheet is empty')
+        rows.collect { row ->
+            ['experiment_id','kit','barcode','alias'].each { column ->
+                if (!(row[column] instanceof CharSequence) || !row[column].toString().trim())
+                    throw new IllegalArgumentException("Demux sheet requires non-empty ${column}; expected sequencer columns experiment_id,kit,barcode,alias")
+                identifier(row[column].toString().trim())
+            }
+            [run:row.experiment_id.toString().trim(), kit:row.kit.toString().trim(),
+             barcode:row.barcode.toString().trim(), sample:row.alias.toString().trim()]
+        }
+    }
+
     static List samples(List rows, List mapping, boolean demux, String kit = null) {
         if (!rows) throw new IllegalArgumentException('Input manifest is empty')
         def seen = []
@@ -105,7 +131,7 @@ class WorkflowPlan {
                     throw new IllegalArgumentException('Duplicate demux barcode mapping or sample identity')
                 keys << [row.run,row.barcode]; ids << row.sample
             }
-            if ((rows*.run as Set) != (mapping*.run as Set)) throw new IllegalArgumentException('Demux and input run IDs must match')
+            if ((rows*.run as Set) != (mapping*.run as Set)) throw new IllegalArgumentException('Demux experiment_id values and input run IDs must match')
             return rows.groupBy { it.run }.collect { run, chunks ->
                 def mappings = mapping.findAll { it.run == run }
                 if (mappings*.kit.unique().size() != 1) throw new IllegalArgumentException('Each run must have one barcode kit')

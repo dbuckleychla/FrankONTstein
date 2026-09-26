@@ -212,6 +212,8 @@ nextflow run . -profile local,docker \
   --image_manifest images.lock.json --secondary --outdir results
 ```
 
+For optional GPU POD5 input, see [basecalling](documentation/basecalling.md). Singleton and multiplexed POD5 runs feed into the same analysis tiers.
+
 Input BAMs must be **unaligned**, basecalled with modified-base calls, and contain valid MM/ML tags. The workflow validates these tags, aligns through Dorado's minimap2-backed aligner, and validates the aligned BAM's modification encoding. Missing tags and stale MN coordinates fail; ordinary FASTQ conversion is not used. Alignment does not perform an exhaustive input/output read comparison or create a SQLite database.
 
 `check_bam.py` uses each task's allocated CPUs for bounded parallel MM/ML decoding,
@@ -234,10 +236,12 @@ Paths in a sample CSV are relative to the launch directory or absolute/S3 paths.
 For pooled BAMs, the input's `sample` identifies the pool; provide `--demux_samplesheet demux.csv`:
 
 ```csv
-run,kit,barcode,sample
+experiment_id,kit,barcode,alias
 run1,SQK-NBD114-24,barcode01,sample1
 run1,SQK-NBD114-24,barcode02,sample2
 ```
+
+`experiment_id` must match the input manifest’s `run` (or `--sample_id` for a direct pooled BAM/POD5 input). `alias` determines output sample names; the sequencer’s `sample_id` does not override it. Only `experiment_id`, `kit`, `barcode`, and `alias` are required. Other columns, including `position_id`, `flow_cell_id`, `sample_id`, `flow_cell_product_code`, and `type`, are optional and ignored for routing. See [the full sequencer-sheet example](assets/demux.csv). Older `run,kit,barcode,sample` demux sheets must rename `run` to `experiment_id` and `sample` to `alias`.
 
 Every run must have one kit and unique barcode-to-sample mappings. A sample may occur only once in the demultiplexing sheet in this release. Unclassified BAMs are retained under `demultiplex/`. A requested barcode with no output or no modification-tagged reads fails explicitly; it is never silently reassigned to another sample.
 
@@ -253,7 +257,7 @@ be demultiplexable.
 - Slurm: `-profile slurm,apptainer --slurm_queue QUEUE --slurm_account ACCOUNT`. Launch from a persistent host with shared work/reference storage. Configure the Apptainer cache outside job scratch.
 - AWS: see [portable Terraform and launch instructions](docs/aws.md). The coordinator runs on your own persistent host; tasks run on AWS Batch.
 
-Use `-c site.config` for site resource overrides. Processes use CPU execution by default. Do not assign GPUs to Dorado demux/trim/align merely because Dorado also supports GPU basecalling.
+Use `-c site.config` for site resource overrides. Processes use CPU execution by default; optional POD5 basecalling requires explicit GPU configuration. Do not assign GPUs to Dorado demux/trim/align merely because Dorado also supports GPU basecalling.
 
 Alignment, Clair3, ClairS-TO, Sniffles, Severus and Stellerator request 16 CPUs
 and 32 GB by default. Classy requests 8 CPUs/8 GB; NASVAR requests 8 CPUs/32 GB.

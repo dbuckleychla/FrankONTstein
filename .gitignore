@@ -10,3 +10,6 @@ __pycache__/
 .env
 .nf-test/
 terraform.tfvars
+
+# Local Terraform output and shell-environment exports.
+.aws-batch/

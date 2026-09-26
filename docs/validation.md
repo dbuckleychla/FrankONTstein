@@ -83,3 +83,19 @@ Before publishing a validated release:
 7. Release a tested image lock and reference-bundle IDs, plus the software/backend compatibility record.
 
 Clinical validation and regulatory qualification are not provided by these software tests.
+
+### Optional POD5 basecalling
+
+`tests/run_basecall_contracts.py` exercises singleton and multiplexed POD5 routing, all tiers, trimming, QC-disabled behavior, deterministic batching, duplicate rejection and resume using stubs. `tests/test_basecalling.py` verifies offline model pairing, Clair3 compatibility and content checksums. `tests/plan.groovy` covers GPU/input preflight and multiplexed failure attribution. Run `nf-test test tests/basecalling.nf.test` for the batching wrapper.
+
+Real acceptance additionally requires small consented/public singleton and multiplexed POD5 data, compatible local models and an NVIDIA host: run each through alignment, Classy and indexed bedMethyl; verify MM/ML/MN and read groups, both 5mC and 5hmC, barcode identity and resume. Record image/model checksums and hardware/backend. Slurm/AWS and classifier/model validation must only be claimed after actual smoke runs.
+
+Basecalling implementation checks (2026-09-25): Nextflow 26.04.6 strict-parser
+planning checks, all BAM and POD5 tier/resume contracts (including multiplexed
+failures and colliding POD5 basenames), 28 Python tests, Slurm/AWS config parsing,
+dependency-lock checks and `terraform fmt -check` passed. The nf-test wrapper was
+run directly with Nextflow; the nf-test CLI was unavailable locally. Real
+Dorado/model/GPU, Slurm and AWS execution remain unvalidated: the development
+host has no NVIDIA device and its Docker daemon was stopped. Terraform validate
+could not start its provider in the sandbox; the unsandboxed retry was blocked
+by an approval-service error. No infrastructure was applied.

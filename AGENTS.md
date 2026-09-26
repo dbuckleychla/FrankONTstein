@@ -4,8 +4,8 @@
 - Model Nextflow DSL2 organization on nf-core/oncoseq: main entrypoint, workflows,
   subworkflows, modules, conf, schemas, docs, and nf-test suites.
 - Primary use is tumor-only ONT adaptive sampling; support hg38/GRCh38 and hs1/CHM13.
-- Inputs are basecalled unaligned BAMs. POD5 basecalling, matched normals, and WGS
-  orchestration are outside the initial scope.
+- Inputs are basecalled unaligned BAMs, or POD5 with explicit optional GPU
+  basecalling. Matched normals and WGS orchestration remain outside scope.
 - `--primary` (default): alignment/QC and methylation/Classy. `--secondary`: primary
   plus NASVAR coverage/MAF/karyotype/CNV/fusions/breakpoints. `--tertiary`: primary,
   full NASVAR and compatible oncoseq callers. Flags are mutually exclusive.
@@ -14,7 +14,8 @@
 - Both `--targets_bed` and `--enrichment_bed` are required in every tier.
 - Resolve relative reference/image-lock paths from projectDir; preserve legacy
   bundle-relative assets and launch-relative sample inputs.
-- Keep `bam`, `genome`, and `sample_id` on the command line in run examples.
+- Keep `bam` (or `pod5` with `basecall`), `genome`, and `sample_id` on the command
+  line in direct-input run examples.
 - Prefer shared top-level run inputs and per-analysis assets under `steps`;
   retain legacy reference bundles. Auto-select NASVAR reference JSON by genome;
   auto-select the matching pediatric leukemia pipeline config as well.

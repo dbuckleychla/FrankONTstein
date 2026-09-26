@@ -1,14 +1,26 @@
 region = "us-west-2"
 name   = "frankontstein-dev"
 # Standard AWS credentials / AWS_PROFILE are honored; no account is embedded.
-max_vcpus = 64
-spot      = false
+# General CPU queue: allowed instance families and total compute capacity.
+instance_types = ["m6i", "r6i"]
+max_vcpus      = 256
+spot           = false
 # Optional existing network, with outbound connectivity for images and assets:
 # vpc_id = "vpc-..."
 # subnet_ids = ["subnet-...", "subnet-..."]
 # Required existing bucket; bucket settings are never changed.
 bucket_name = "your-existing-bucket"
 # All work/results writes are scoped beneath this prefix.
-s3_prefix = "frankONTstein/"
+s3_prefix = "FrankONTstein/"
 # read_bucket_arns = ["arn:aws:s3:::your-input-bucket"]
 # permissions_boundary_arn = "arn:aws:iam::<account>:policy/<boundary>"
+
+# Optional NVIDIA GPU compute and dedicated Batch queue for basecalling.
+# Uncomment to enable; omitting gpu_instance_types defaults to [] (disabled).
+# gpu_instance_types = ["g6e"]
+# gpu_max_vcpus      = 32
+
+# Optional: reuse a self-contained AWS CLI installation already in BOTH EC2 AMIs.
+# No CLI download/package installation occurs in this mode.
+# use_existing_aws_cli  = true
+# existing_aws_cli_path = "/usr/local/aws-cli/v2/current/bin/aws"

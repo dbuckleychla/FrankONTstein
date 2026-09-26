@@ -9,7 +9,8 @@ class RunStatus {
             runState.error = taskFault?.error?.message ?: runState.error
             def summaryTrace = 'name\tstatus\n' + runState.completed.collect { item -> "PUBLISH_ARTIFACT (${item.sample}:${item.analysis})\tCOMPLETED\n" }.join('')
             if (runState.failureTask) summaryTrace += "${runState.failureTask}\tFAILED\n"
-            def analyses = RunStatus.summarize(runState.samples, (runState.provenance.plan?.callers ?: []) + ['bedmethyl','qc'], summaryTrace)
+            def analyses = RunStatus.summarize(runState.samples, (runState.provenance.plan?.callers ?: []) + ['bedmethyl','qc'] + (runState.provenance.basecalling?.enabled ? ['basecalling'] : []), summaryTrace, runState.inputGroups ?: [:])
+            if (runState.failureTask?.contains('CHECK_BASECALL_MODELS')) analyses.findAll { it.analysis == 'basecalling' }.each { it.status = 'failed' }
             analyses.each { row ->
                 row.files = runState.completed.findAll { it.sample == row.sample && it.analysis == row.analysis }.collectMany { it.files ?: [] }.unique()
                 if (row.analysis == 'qc' && runState.provenance.parameters?.disable_qc?.toString() == 'true') row.status = 'skipped'
@@ -26,8 +27,8 @@ class RunStatus {
         ]))
     }
 
-    static List summarize(List samples, List callers, String trace) {
-        def aliases = [MODKIT_PILEUP:'bedmethyl', INDEX_BEDMETHYL:'bedmethyl', SAMPLE_QC:'qc', ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
+    static List summarize(List samples, List callers, String trace, Map inputGroups = [:]) {
+        def aliases = [DORADO_BASECALL:'basecalling', MODKIT_PILEUP:'bedmethyl', INDEX_BEDMETHYL:'bedmethyl', SAMPLE_QC:'qc', ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
             CLAIRS_TO_CALL:'clairsto', BCFTOOLS_MPILEUP:'bcftools', BCFTOOLS_CALL:'bcftools',
             SNIFFLES_CALL:'sniffles', SEVERUS_TUMOR_UNPHASED:'severus', STELLERATOR:'stellerator',
             QDNASEQ_CALL:'qdnaseq', DELLY:'delly', SUBCHROM:'subchrom', ICHORCNA:'ichorcna']
@@ -45,9 +46,12 @@ class RunStatus {
                     def sample = match.group(2)
                     def analysis = process == 'PUBLISH_ARTIFACT' ? match.group(3) : process == 'FILTER_VARIANTS' ? match.group(3)?.tokenize(':')?.getAt(0) : aliases[process]
                     if (analysis) {
-                        def key = [sample,analysis]
-                        if (status == 'FAILED') outcomes[key] = 'failed'
-                        else if (status in ['COMPLETED','CACHED'] && process in ['PUBLISH_ARTIFACT','ALIGN'] && outcomes[key] != 'failed') outcomes[key] = 'completed'
+                        def targets = process == 'DORADO_BASECALL' ? (inputGroups[sample] ?: [sample]) : [sample]
+                        targets.each { target ->
+                            def key = [target,analysis]
+                            if (status == 'FAILED') outcomes[key] = 'failed'
+                            else if (status in ['COMPLETED','CACHED'] && process in ['PUBLISH_ARTIFACT','ALIGN'] && outcomes[key] != 'failed') outcomes[key] = 'completed'
+                        }
                     }
                 }
             }

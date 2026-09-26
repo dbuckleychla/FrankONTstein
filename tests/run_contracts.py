@@ -67,6 +67,8 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-contract-') as scratch:
                 assert not (out/sample/'methylation/methylation').exists()
         if tier=='secondary':
             assert (out/'demultiplex/run1/unclassified.bam').exists()
+            for barcode in ('barcode01', 'barcode02'):
+                assert (out/f'demultiplex/run1/{barcode}/{barcode}.bam').exists()
             assert not (out/'demultiplex/run1/demux').exists()
         with (out/'pipeline_info/trace.tsv').open() as handle:
             names = [r['name'] for r in csv.DictReader(handle, delimiter='\t')]

@@ -3,6 +3,7 @@
 import argparse
 import json
 import multiprocessing
+import re
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 import pysam
@@ -29,11 +30,12 @@ def validate_batch(records):
         validate_modifications(read)
 
 
-def check(path, unaligned=False, threads=1):
+def check(path, unaligned=False, threads=1, require_cpg_modifications=False, require_moves=False):
     if threads < 1:
         raise ValueError('threads must be at least 1')
     reads = modified = bases = 0
     groups = set()
+    modification_codes = set()
     # One reader plus N-1 decoding workers; no index or temporary BAMs needed.
     # Spawn avoids inheriting HTSlib handles across a fork.
     pool = (ProcessPoolExecutor(max_workers=threads - 1,
@@ -52,10 +54,19 @@ def check(path, unaligned=False, threads=1):
                     raise ValueError(f'{path}: expected unaligned BAM')
                 if read.has_tag('RG'):
                     groups.add(read.get_tag('RG'))
+                if require_moves and not read.is_secondary and not read.is_supplementary:
+                    if not read.has_tag('mv'):
+                        raise ValueError(f'{read.query_name}: missing mv tag required by Clair3 with_mv model')
+                    moves = read.get_tag('mv')
+                    if len(moves) < 2 or moves[0] <= 0 or sum(moves[1:]) != read.query_length:
+                        raise ValueError(f'{read.query_name}: invalid or stale move table')
                 mm, ml = read.has_tag('MM'), read.has_tag('ML')
                 if mm != ml:
                     raise ValueError(f'{read.query_name}: MM and ML must occur together')
                 if mm:
+                    if require_cpg_modifications and not {'m', 'h'} <= modification_codes:
+                        for codes in re.findall(r'(?:^|;)C[+-]([a-z]+)', read.get_tag('MM')):
+                            modification_codes.update(codes)
                     if read.has_tag('MN') and read.get_tag('MN') != read.query_length:
                         raise ValueError(f'{read.query_name}: stale MN tag after sequence change')
                     if pool is None:
@@ -82,6 +93,8 @@ def check(path, unaligned=False, threads=1):
             pool.shutdown(wait=True, cancel_futures=True)
     if not reads or not modified:
         raise ValueError(f'{path}: no reads with methylation tags; Classy requires modified-base calls')
+    if require_cpg_modifications and not {'m', 'h'} <= modification_codes:
+        raise ValueError(f'{path}: basecalling must emit both 5mC and 5hmC modification codes')
     if groups - header_groups:
         raise ValueError(f'{path}: read groups missing from header: {groups - header_groups}')
     return {'reads': reads, 'bases': bases, 'modified_reads': modified, 'read_groups': sorted(groups)}
@@ -92,5 +105,8 @@ if __name__ == '__main__':
     parser.add_argument('--unaligned', action='store_true')
     parser.add_argument('--threads', type=int, default=1,
                         help='Total CPU budget: one BAM reader plus decoding workers (default: 1)')
+    parser.add_argument('--require-cpg-modifications', action='store_true',
+                        help='Require both cytosine m and h codes from combined POD5 modification calling')
+    parser.add_argument('--require-moves', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(check(args.bam, args.unaligned, args.threads), indent=2))
+    print(json.dumps(check(args.bam, args.unaligned, args.threads, args.require_cpg_modifications, args.require_moves), indent=2))

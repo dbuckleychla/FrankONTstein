@@ -2,6 +2,9 @@
 
 `terraform/aws` provisions Batch CPU compute, a queue, task/instance/service IAM roles, a coordinator policy, read-only access to an existing S3 bucket, and CloudWatch logs. There are no institution-specific account IDs, AMIs, secrets or DRAGEN resources.
 
+See [AWS CLI and Terraform permissions](../documentation/aws-cli-permissions.md)
+for the deployment action inventory, coordinator/task permissions and profile checks.
+
 Credentials use the standard AWS provider chain (including `AWS_PROFILE` or assumed roles); region is explicit. Terraform state remains under your control: configure a backend appropriate for your account before production deployment. Do not commit state or real tfvars files.
 
 ```bash
@@ -46,23 +49,25 @@ cache for `-resume`; set the desired prefix before starting a new run.
 
 `permissions_boundary_arn` supports institutional IAM boundaries without requiring them. The coordinator policy is emitted but is not attached automatically to an arbitrary user. Have your account administrator attach it to the identity that runs Nextflow. It permits task submission, job-definition registration, status/log reads, task-role passing, and scoped data access.
 
-After an account owner applies the reviewed infrastructure:
+After an account owner applies the reviewed infrastructure, load its AWS settings
+into your shell and run Nextflow directly:
 
 ```bash
-terraform output -json nextflow_params > aws.params.json
-terraform output -raw work_dir
+AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py --run-id run1)" &&
+  eval "$AWS_BATCH_ENV"
+
+nextflow run . -profile aws \
+  -params-file assets/aws_batch_references.yaml \
+  --primary --bam s3://YOUR_INPUT_BUCKET/run1/sample.bam \
+  --sample_id sample1 --genome hg38
 ```
 
-Move `aws.params.json` to the workflow launch directory and launch:
-
-```bash
-nextflow run . -profile aws -params-file aws.params.json \
-  -work-dir s3://YOUR_BUCKET/frankONTstein/work/RUN_ID \
-  --outdir s3://YOUR_BUCKET/frankONTstein/results/RUN_ID \
-  --input samples.csv --reference_bundle bundle.json \
-  --targets_bed targets.bed --enrichment_bed enrichment.bed \
-  --image_manifest images.lock.json --secondary
-```
+Run from the workflow checkout with your authorized `AWS_PROFILE` selected.
+Check that the environment load succeeds before starting Nextflow. See
+[loading AWS settings from Terraform](../documentation/aws-batch-launch.md) for
+POD5 runs, explicit overrides, alternate Terraform directories and saved exports.
+The helper emits shell exports only; it never launches Nextflow or applies Terraform.
+Explicit Nextflow CLI options remain supported and take precedence.
 
 Use a persistent coordinator (for example, a managed server with tmux/systemd) and retain its `.nextflow` history/cache. Losing the launcher's state can prevent resume even when S3 work objects survive. On interruption, rerun with `-resume`, the same launch directory and work prefix. Spot interruptions use Nextflow's bounded retry behavior; deterministic application errors terminate instead of retrying indefinitely.
 
@@ -73,3 +78,5 @@ For optional Clair3 GPU execution, set `gpu_instance_types = ["g5"]` to create a
 Offline storage contract tests use the mocked AWS provider: `terraform test`
 from `terraform/aws` (no AWS deployment). They cover the default/custom prefixes
 and reject root/parent prefixes and bucket URLs.
+
+The same optional GPU queue supports POD5 basecalling with `--basecall --aws_gpu_queue GPU_QUEUE`. Basecalling requests one accelerator per task; merge/demultiplex/alignment remain on the CPU queue. See [basecalling](../documentation/basecalling.md). No infrastructure changes or Terraform apply are needed when an appropriate GPU queue already exists.

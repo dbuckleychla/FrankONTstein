@@ -5,7 +5,7 @@ output "nextflow_params" {
     aws_queue      = aws_batch_job_queue.this.name
     aws_job_role   = aws_iam_role.task.arn
     aws_logs_group = aws_cloudwatch_log_group.batch.name
-    aws_cli_path   = "/opt/aws-cli/v2/current/bin/aws"
+    aws_cli_path   = var.use_existing_aws_cli ? var.existing_aws_cli_path : "/opt/aws-cli/v2/current/bin/aws"
     outdir         = "s3://${local.bucket_name}/${local.results_prefix}"
   }
 }

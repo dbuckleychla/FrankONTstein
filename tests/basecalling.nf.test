@@ -1,0 +1,11 @@
+nextflow_pipeline {
+    name "GPU basecalling batch channel contract (stubs only)"
+    script "basecalling_workflow.nf"
+    options "-stub-run -lib ${System.getenv('FRANKONTSTEIN_TEST_ROOT') ?: new File('.').absolutePath}/lib"
+
+    test("two POD5 batches retain one run identity") {
+        then {
+            assert workflow.success
+        }
+    }
+}

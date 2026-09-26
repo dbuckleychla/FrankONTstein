@@ -80,3 +80,56 @@ assert planner.qcDisabled([disableQc:'true',disable_qc:false]) == true
 def qcFailure = statusClass.summarize(['s1'], ['qc','bedmethyl'], 'name\tstatus\nPRIMARY:SAMPLE_QC (s1)\tFAILED\nPRIMARY:INDEX_BEDMETHYL (s1)\tFAILED\n')
 assert qcFailure.find { it.analysis == 'qc' }.status == 'failed'
 assert qcFailure.find { it.analysis == 'bedmethyl' }.status == 'failed'
+
+def basecaller = loader.parseClass(new File('lib/Basecalling.groovy'))
+def raw = [basecall:true,pod5:'raw',sample_id:'s',basecall_tasks:16,basecall_device:'0',steps:[basecall:[model:'model',modified_models:['mod']]]]
+assert basecaller.validate(raw, 'local','local,docker').max_forks == 1
+assert basecaller.validate(raw + [gpu_queue:'gpu'], 'slurm','slurm,apptainer').max_forks == 32
+assert basecaller.validate(raw + [aws_gpu_queue:'gpu'], 'awsbatch','aws').queue == 'gpu'
+rejects { basecaller.validate(raw, 'slurm','slurm,apptainer') }
+rejects { basecaller.validate(raw, 'awsbatch','aws') }
+rejects { basecaller.validate(raw, 'sge','sge') }
+rejects { basecaller.validate(raw + [basecall_device:null], 'local','local,docker') }
+rejects { basecaller.validate(raw + [basecall_device:'all'], 'local','local,docker') }
+rejects { basecaller.validate(raw + [basecall_max_forks:2], 'local','local,docker') }
+rejects { basecaller.validate(raw + [basecall_tasks:0], 'local','local,docker') }
+rejects { basecaller.validate(raw + [bam:'x.bam'], 'local','local,docker') }
+rejects { basecaller.validate(raw + [basecall:false], 'local','local,docker') }
+rejects { basecaller.validate(raw + [steps:[:]], 'local','local,docker') }
+assert basecaller.validate([bam:'x',sample_id:'s'], 'local','local').enabled == false
+assert basecaller.batches(['c','a','b'],2) == [['a','c'],['b']]
+assert basecaller.batches(['b','a'],16) == [['a'],['b']]
+rejects { basecaller.batches([],16) }
+rejects { basecaller.batches(['a','a'],16) }
+rejects { basecaller.rows([[bam:'a',pod5:'b']],true) }
+rejects { basecaller.rows([[pod5:'a']],false) }
+assert basecaller.rows([[sample:'s',run:'r',pod5:'p']],true)[0].bam == 'p'
+assert planner.reference([steps:[basecall:[model:'x']]], hg38 + [fasta:'ref.fa',fai:'ref.fa.fai'], '/project').fasta == 'ref.fa'
+def rawFailure = statusClass.summarize(['s1','s2'], ['basecalling'], 'name\tstatus\nPRIMARY:DORADO_BASECALL (r:batch_00000001)\tFAILED\n', [r:['s1','s2']])
+assert rawFailure.findAll { it.analysis == 'basecalling' }.every { it.status == 'failed' }
+println 'Basecalling input, GPU, batching and failure contracts passed'
+
+// Sequencer exports accept arbitrary optional columns; alias, not sample_id, routes outputs.
+def sequencer = [[position_id:'p2i-00715-A',flow_cell_id:'PBM29238',sample_id:'other-sequencer-id',experiment_id:'ONT20260917',flow_cell_product_code:'FLO-PRO114M',kit:'SQK-NBD114-24',barcode:'barcode03',alias:'BC3',type:'na',extra:'free text / metadata'],
+                 [experiment_id:'ONT20260917',kit:'SQK-NBD114-24',barcode:'barcode04',alias:'BC4']]
+def normalizedSheet = planner.demuxRows(sequencer)
+assert normalizedSheet == [[run:'ONT20260917',kit:'SQK-NBD114-24',barcode:'barcode03',sample:'BC3'],[run:'ONT20260917',kit:'SQK-NBD114-24',barcode:'barcode04',sample:'BC4']]
+def pooled = [[sample:'pool',run:'ONT20260917',bam:'pooled.bam']]
+assert planner.samples(pooled, normalizedSheet, true)[0][0].mappings*.sample == ['BC3','BC4']
+['experiment_id','kit','barcode','alias'].each { field ->
+    def missing = new LinkedHashMap(sequencer[0]); missing.remove(field)
+    rejects { planner.demuxRows([missing]) }
+    rejects { planner.demuxRows([sequencer[0] + [(field):' ']]) }
+}
+rejects { planner.demuxRows([]) }
+rejects { planner.demuxRows([[run:'r',kit:'kit',barcode:'barcode01',sample:'s']]) }
+rejects { planner.demuxRows([sequencer[0] + [alias:'bad sample name']]) }
+rejects { planner.samples(pooled, planner.demuxRows([sequencer[0],sequencer[0]]), true) }
+rejects { planner.samples(pooled, planner.demuxRows([sequencer[0],sequencer[1] + [alias:'BC3']]), true) }
+rejects { planner.samples(pooled, planner.demuxRows([sequencer[0],sequencer[1] + [kit:'other-kit']]), true) }
+rejects { planner.samples(rows, normalizedSheet, true) }
+println 'Sequencer-sheet normalization and validation contracts passed'
+
+def externalClair3 = 's3://example/models/r1041_e82_400bps_sup_v520_with_mv'
+assert planner.reference(shared + [basecall_model:'sup', steps:[clair3:[model:externalClair3]]], [:], '/project').models.clair3 == externalClair3
+rejects { planner.reference(shared + [basecall_model:'hac', steps:[clair3:[model:externalClair3]]], [:], '/project') }

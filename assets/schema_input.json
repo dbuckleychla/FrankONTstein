@@ -6,8 +6,7 @@
     "type": "object",
     "required": [
       "sample",
-      "run",
-      "bam"
+      "run"
     ],
     "properties": {
       "sample": {
@@ -21,7 +20,33 @@
       "bam": {
         "type": "string",
         "minLength": 1
+      },
+      "pod5": {
+        "type": "string",
+        "minLength": 1
       }
-    }
+    },
+    "oneOf": [
+      {
+        "required": [
+          "bam"
+        ],
+        "not": {
+          "required": [
+            "pod5"
+          ]
+        }
+      },
+      {
+        "required": [
+          "pod5"
+        ],
+        "not": {
+          "required": [
+            "bam"
+          ]
+        }
+      }
+    ]
   }
 }

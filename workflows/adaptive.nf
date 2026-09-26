@@ -1,3 +1,4 @@
+include { CHECK_BASECALL_MODELS; DORADO_BASECALL } from '../modules/local/basecall/main'
 include { MODKIT_PILEUP; INDEX_BEDMETHYL; SAMPLE_QC; DEMUX_QC } from '../modules/local/qc/main'
 include { PREPARE_BAM; DEMULTIPLEX; TRIM_BAM; ALIGN } from '../modules/local/preprocess/main'
 include { VALIDATE_REFERENCE } from '../modules/local/reference/main'
@@ -15,8 +16,34 @@ workflow PRIMARY {
     statusState
     main:
     VALIDATE_REFERENCE(ref, assets.enrichment, assets.targets, assets.repeats, assets.gff, assets.sites, assets.config, assets.reference, plan.callers.contains('nasvar'))
-    PREPARE_BAM(samples)
-    versions = PREPARE_BAM.out.versions
+    basecallVersions = Channel.empty()
+    basecallRecords = Channel.empty()
+    bamInputs = samples
+    if (assets.basecalling.enabled) {
+        CHECK_BASECALL_MODELS(assets.basecall_models.model, assets.basecall_models.modified[0], plan.callers.contains('clair3'), assets.clair3_model)
+        batches = samples.flatMap { meta, paths ->
+            Basecalling.batches(paths, assets.basecalling.tasks).withIndex().collect { batch, index ->
+                tuple(meta, String.format('batch_%08d', index + 1), batch)
+            }
+        }
+        DORADO_BASECALL(batches, assets.basecall_models.model, assets.basecall_models.modified[0], CHECK_BASECALL_MODELS.out.provenance)
+        bamInputs = DORADO_BASECALL.out.bam.groupTuple(by:0).map { meta, ids, bams ->
+            def ordered = (0..<ids.size()).toList().sort { a,b -> ids[a] <=> ids[b] }.collect { bams[it] }
+            tuple(meta, ordered)
+        }
+        basecallRecords = bamInputs.flatMap { meta, bams ->
+            def sampleIds = meta.mappings ? meta.mappings.collect { it.sample } : [meta.id]
+            def logs = bams.collect { "basecalling/${meta.id}/${it.baseName}.log" }
+            sampleIds.collect { id ->
+                def record = [sample:id, analysis:'basecalling', status:'completed', files:['basecalling/models.json'] + logs]
+                statusState.completed.add(record)
+                record
+            }
+        }
+        basecallVersions = DORADO_BASECALL.out.versions
+    }
+    PREPARE_BAM(bamInputs)
+    versions = PREPARE_BAM.out.versions.mix(basecallVersions)
     if (params.demux_samplesheet) {
         DEMULTIPLEX(PREPARE_BAM.out.bam)
         versions = versions.mix(DEMULTIPLEX.out.versions)
@@ -25,7 +52,7 @@ workflow PRIMARY {
             meta.mappings.collect { mapping ->
                 def matched = files.findAll { it.name.tokenize('_-.').contains(mapping.barcode) }
                 if (matched.size() != 1) error "${meta.id}/${mapping.barcode}: expected one demultiplexed BAM, got ${matched.size()}"
-                tuple([id:mapping.sample, kit:meta.kit, input_run:meta.id], matched[0])
+                tuple([id:mapping.sample, kit:meta.kit, input_run:meta.id, require_moves:meta.require_moves ?: false], matched[0])
             }
         }
     } else {
@@ -67,6 +94,7 @@ workflow PRIMARY {
         qcMetrics = SAMPLE_QC.out.metrics
     }
     emit:
+    basecall_records = basecallRecords
     bam = aligned
     reference = VALIDATE_REFERENCE.out.reference
     reference_assets = VALIDATE_REFERENCE.out.assets
@@ -117,6 +145,7 @@ workflow REPORTING {
     provenance
     statusState
     qcMetrics
+    basecallRecords
     main:
     PUBLISH_ARTIFACT(artifacts)
     records = PUBLISH_ARTIFACT.out.results.map { m,a,files ->
@@ -125,6 +154,7 @@ workflow REPORTING {
         statusState.completed.add(record)
         record
     }.mix(aligned.map { m,b,i -> [sample:m.id, analysis:'alignment', status:'completed', files:["${m.id}/alignment/${b.name}", "${m.id}/alignment/${i.name}"]] })
+    records = records.mix(basecallRecords)
     SOFTWARE_VERSIONS(versions.collect().map { it.sort { a,b -> a.toString() <=> b.toString() } })
     completeRecords = records.collect().map { rows ->
         def grouped = rows.groupBy { [it.sample, it.analysis] }.collect { key, items ->

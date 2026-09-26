@@ -1,0 +1,75 @@
+# AWS Batch references mapped 1:1 from assets/ec2_test_references.yaml.
+# Object keys verified against s3_refdata_dir.txt; bucket confirmed by the user.
+# Pass --bam (or --basecall --pod5), --genome hg38 and --sample_id on the CLI.
+# Use -profile aws plus the Terraform-generated AWS queue/role/work settings.
+# Vendor assets and images.lock.json remain relative to projectDir on the coordinator.
+# Nextflow stages vendor reference files and S3 assets into the Batch tasks.
+# This file does not enable basecalling or change the analysis tier/callers.
+# Clair3/SubChrom use the matching external SUP v5.2.0 move-aware weights below.
+# Reference version label.
+reference_id: hg38-v1
+# Genome FASTA; requires a matching .fai index.
+fasta: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/fasta/hg38.fa
+# Explicit copy of the EC2 config's implicit FASTA index path.
+fai: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/fasta/hg38.fa.fai
+# Target regions without enrichment padding (BED).
+targets_bed: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/targets/DARGAN_OCCRA_ALMA_CHLA_wishlist.GENCODE_v50.hg38.bed
+# Regions selected for adaptive sampling (BED).
+enrichment_bed: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/targets/DARGAN_OCCRA_ALMA_CHLA_wishlist.GENCODE_v50.20000bp-buffer.hg38.bed
+# Container digest lock from GitHub Actions.
+image_manifest: images.lock.json
+# Assets must match --genome; see docs/reference-sources.md.
+# Basecaller accuracy: sup, hac or fast; selects bundled Clair3 weights.
+basecall_model: sup
+# Skip comprehensive QC only; bedMethyl and Classy remain enabled.
+disable_qc: false
+steps:
+
+  # SUP matches the EC2 config's accuracy selection; both directories include
+  # config.toml and tensor weights in the supplied listing. No runtime download.
+  basecall:
+    model: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/dorado-models/dna_r10.4.1_e8.2_400bps_sup@v5.2.0
+    modified_models:
+      - s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/dorado-models/dna_r10.4.1_e8.2_400bps_sup@v5.2.0_5mCG_5hmCG@v2
+
+  # Pediatric leukemia configs selected automatically by genome.
+  nasvar:
+    # Repeat regions (BED).
+    repeats: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/nasvar/repeats.bed
+    # Common SNPs: headerless chrom, position (1-based), REF, ALT TSV.
+    sites: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/nasvar/maf_sites_all.tsv
+    # GFF3: verify gene Name attributes and NASVAR-config transcript IDs.
+    gff: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/nasvar/GCF_000001405.40_GRCh38.p14_genomic.gff
+
+  # Uploaded Clair3 SUP v5.2.0 move-aware model.
+  clair3:
+    model: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/clair3/r1041_e82_400bps_sup_v520_with_mv
+
+  clairsto:
+    # ClairS-TO model identifier (not a path).
+    model: ont_r10_dorado_sup_5khz_ssrs
+
+  stellerator:
+    # Custom fusion loci in Stellerator --loci format.
+    fusion_list: vendor/oncoseq/assets/fusion-list.txt
+
+  delly:
+    # Delly mappability map matching the exact FASTA.
+    map: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/delly/Homo_sapiens.GRCh38.dna.primary_assembly.fa.r101.s501.blacklist.gz
+
+  subchrom:
+    # Custom enrichment panel bins (BED) generated from subchrom PanelBin.py
+    panel: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/hg38/subchrom/hg38.SubChrom_PanelBin.bed
+
+  # Standard hg38 resources; 1 Mb bins.
+  ichorcna:
+    # GC-content WIG, 1 Mb bins.
+    gc: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/gc_hg38_1000kb.wig
+    # Mappability WIG, 1 Mb bins.
+    map: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/map_hg38_1000kb.wig
+    # Centromere exclusion coordinates.
+    centromeres: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/GRCh38.GCA_000001405.2_centromere_acen.txt
+    # Standard hg38 low-pass-WGS normal panel (1 Mb, RDS).
+    panel: vendor/oncoseq/modules/local/ichorcna/ichorCNA/inst/extdata/HD_ULP_PoN_hg38_1Mb_median_normAutosome_median.rds
+    # Generated RData containing the seqinfo chromosome metadata object.
+    seqinfo: s3://plm-cpm-sandbox-research-usw2/ONT/FrankONTstein_refdata/ichorCNA/seqinfo.RData

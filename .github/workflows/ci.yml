@@ -35,8 +35,10 @@ jobs:
       - run: python3 -m pip install pysam==0.23.3
       - run: python3 -m unittest discover -s tests -v
       - run: nextflow run tests/plan_checks.nf -lib lib
+      - run: python3 tests/run_aws_environment_contracts.py
       - run: python3 tests/run_contracts.py
-      - run: nf-test test tests/reference.nf.test
+      - run: python3 tests/run_basecall_contracts.py
+      - run: nf-test test tests/reference.nf.test tests/basecalling.nf.test
         env:
           FRANKONTSTEIN_TEST_ROOT: ${{ github.workspace }}
   terraform:

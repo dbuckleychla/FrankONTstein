@@ -88,11 +88,15 @@ zero, but NAT gateway, storage, logs and any coordinator host still incur costs.
 The new VPC uses a single NAT gateway, so outbound connectivity depends on that
 availability zone and traffic from the other zone can incur cross-AZ charges.
 
+See [AWS CLI and Terraform permissions](aws-cli-permissions.md) for the deployment
+action inventory, runtime policy scopes, and profile-check commands.
+
 ## Coordinator and resume
 
 Attach the exported `coordinator_policy_arn` to the coordinator's IAM identity.
-Use `nextflow_params` with the AWS profile and pass `work_dir` as Nextflow's
-`-work-dir`. Nextflow registers task job definitions and submits them to Batch;
+The [AWS environment helper](aws-batch-launch.md) reads `nextflow_params` and
+`work_dir`, adds a run-specific path suffix and exports defaults consumed by the
+Nextflow AWS profile. Run Nextflow directly after loading the exports. Nextflow registers task job definitions and submits them to Batch;
 Terraform provisions the compute environments and queues.
 
 Preserve the coordinator's launch directory and `.nextflow/cache` together with

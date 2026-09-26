@@ -88,3 +88,7 @@ been pushed; inspect the run log before retrying.
 The task scripts under `bin/` are staged by Nextflow. The preprocessing image supplies Python/pysam; the NASVAR image supplies Python. CPU-only execution is the default. Native ARM64 support has not been validated across upstream images.
 
 Optional `--clair3_gpu` adds Clair3's GPU flag and requests GPU access in the selected backend: Docker `--gpus all`, Apptainer `--nv`, Slurm `--gres=gpu:1` with optional `--gpu_queue`, or an AWS GPU queue. The selected image and host driver must be compatible. Other callers remain on CPU.
+
+## POD5 basecalling compatibility
+
+Optional basecalling reuses the digest-pinned `preprocess` image. It requires NVIDIA/CUDA, `nvidia-smi`, and Dorado basecaller options `--device`, `--no-trim`, and `--modified-bases-models`. A runtime preflight checks the installed CLI and supplied offline model assets. No vendor gitlink, image digest or dependency version changes are required. See [model compatibility and execution settings](../documentation/basecalling.md). Container/GPU integration must be validated on NVIDIA hardware; stub tests do not establish model compatibility.

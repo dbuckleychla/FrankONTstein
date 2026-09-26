@@ -109,3 +109,18 @@ variable "gpu_max_vcpus" {
   type    = number
   default = 32
 }
+
+variable "use_existing_aws_cli" {
+  type        = bool
+  default     = false
+  description = "Use AWS CLI already installed in the EC2 AMI instead of downloading it during bootstrap. Applies to CPU and GPU instances."
+}
+variable "existing_aws_cli_path" {
+  type        = string
+  default     = "/usr/local/aws-cli/v2/current/bin/aws"
+  description = "Absolute path to the existing, self-contained AWS CLI installation in both EC2 AMIs; Nextflow mounts this installation into task containers."
+  validation {
+    condition     = can(regex("^/[A-Za-z0-9_./-]+/aws$", var.existing_aws_cli_path))
+    error_message = "Use an absolute AWS CLI executable path ending in /aws, without spaces or shell metacharacters."
+  }
+}

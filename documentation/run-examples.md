@@ -144,10 +144,10 @@ pool1,run1,/data/pooled.part1.bam
 pool1,run1,/data/pooled.part2.bam
 ```
 
-Create `demux.csv` using your actual kit and barcode assignments:
+Use the sequencer-exported `demux.csv`, or supply its four required columns:
 
 ```csv
-run,kit,barcode,sample
+experiment_id,kit,barcode,alias
 run1,SQK-NBD114-24,barcode01,BC3
 run1,SQK-NBD114-24,barcode02,BC4
 ```
@@ -162,7 +162,7 @@ nextflow run . \
   -work-dir work/demultiplexed
 ```
 
-The kit comes from the demux sheet. Demultiplexing precedes trimming; unclassified
+The kit comes from the demux sheet. `experiment_id` matches `pooled.csv`’s `run`; `alias` names the output sample. Extra sequencer columns are accepted, and `sample_id` is not used for routing. Demultiplexing precedes trimming; unclassified
 reads are retained separately. Missing barcodes fail explicitly. Omit `--trim`
 if trimming is not wanted.
 
@@ -278,3 +278,14 @@ nextflow run ./main.nf -profile local,docker -params-file references.yaml \
 
 See [QC outputs and metric definitions](qc.md) for on/off-enrichment coverage,
 read lengths, CpG summaries and large-BAM execution costs.
+
+## Optional POD5 input
+
+See [basecalling examples and model/GPU requirements](basecalling.md) for singleton and multiplexed raw POD5 runs. Existing BAM commands above remain valid.
+
+## Launch using Terraform outputs
+
+Use [the AWS environment helper](aws-batch-launch.md) to load queues, region,
+role, logs and output/work paths into your shell. Then run Nextflow directly with
+the same BAM/POD5, reference, demultiplexing and tier arguments shown above.
+The helper does not launch Nextflow or apply Terraform.

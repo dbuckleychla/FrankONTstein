@@ -7,12 +7,23 @@ Content-Type: text/x-shellscript; charset="us-ascii"
 #!/bin/bash
 set -euo pipefail
 systemctl stop ecs || true
-dnf install -y unzip curl
+%{ if use_existing_aws_cli ~}
+# Verify before allowing ECS to accept jobs; never download a fallback.
+test -x '${existing_aws_cli_path}'
+'${existing_aws_cli_path}' --version
+%{ else ~}
+# ECS AL2023 provides curl-minimal, which supports this HTTPS download.
+# Installing the full curl package conflicts with curl-minimal and aborts boot.
+dnf install -y unzip
+if ! command -v curl >/dev/null 2>&1; then
+    dnf install -y curl-minimal
+fi
 install -d /opt/frankontstein-bootstrap
 cd /opt/frankontstein-bootstrap
 curl --fail --location --retry 5 "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${aws_cli_version}.zip" -o awscliv2.zip
 unzip -q awscliv2.zip
 ./aws/install --install-dir /opt/aws-cli --bin-dir /opt/aws-cli-bin
 /opt/aws-cli/v2/current/bin/aws --version
+%{ endif ~}
 systemctl start ecs --no-block
 --FRANKONTSTEIN--

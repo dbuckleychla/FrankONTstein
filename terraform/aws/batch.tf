@@ -1,6 +1,6 @@
 resource "aws_launch_template" "batch" {
   name_prefix = "${var.name}-"
-  user_data   = base64encode(templatefile("${path.module}/templates/user_data.mime", { aws_cli_version = var.aws_cli_version }))
+  user_data   = base64encode(templatefile("${path.module}/templates/user_data.mime", { aws_cli_version = var.aws_cli_version, use_existing_aws_cli = var.use_existing_aws_cli, existing_aws_cli_path = var.existing_aws_cli_path }))
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {

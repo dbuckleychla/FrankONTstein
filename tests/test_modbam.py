@@ -36,6 +36,23 @@ class ModbamTests(unittest.TestCase):
             read.set_tag('MM','C+m,0,0;');read.set_tag('ML',array.array('B',probabilities));read.set_tag('MN',mn)
         with pysam.AlignmentFile(path,'wb',header=header) as out: out.write(read)
         return path
+    def test_required_moves(self):
+        source = self.bam('no_moves.bam')
+        with self.assertRaisesRegex(ValueError, 'missing mv'):
+            self.check.check(source, require_moves=True)
+        for count in (6, 5):
+            path = self.root / f'moves_{count}.bam'
+            with pysam.AlignmentFile(source, 'rb') as src:
+                read = next(src)
+                read.set_tag('mv', array.array('b', [5] + [1] * count))
+                with pysam.AlignmentFile(path, 'wb', header=src.header) as out:
+                    out.write(read)
+            if count == 6:
+                self.check.check(path, require_moves=True)
+            else:
+                with self.assertRaisesRegex(ValueError, 'stale move'):
+                    self.check.check(path, require_moves=True)
+
     def test_valid_modbam(self):
         self.assertEqual(self.check.check(self.bam('input.bam'),True)['modified_reads'],1)
     def run_check(self, path, threads):
@@ -80,3 +97,16 @@ class ModbamTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.check.check(self.bam('missing.bam',tags=False))
     def test_reject_stale_trim_coordinates(self):
         with self.assertRaises(ValueError): self.check.check(self.bam('stale.bam',mn=9))
+
+    def test_basecalled_bam_requires_both_modification_codes(self):
+        source = self.bam('only_m.bam')
+        with self.assertRaisesRegex(ValueError, 'both 5mC and 5hmC'):
+            self.check.check(source, require_cpg_modifications=True)
+        path = self.root/'both.bam'
+        with pysam.AlignmentFile(source, 'rb') as src:
+            read = next(src)
+            read.set_tag('MM', 'C+mh,0,0;')
+            read.set_tag('ML', array.array('B', [200, 20, 100, 30]))
+            with pysam.AlignmentFile(path, 'wb', header=src.header) as out:
+                out.write(read)
+        self.assertEqual(self.check.check(path, require_cpg_modifications=True)['modified_reads'], 1)
