@@ -15,7 +15,16 @@ def count(path):
             reads+=1; bases+=r.query_length or 0
     return Path(path).name,dict(reads=reads,bases=bases)
 
+def aggregate(results):
+    totals = {}
+    for name, counts in results:
+        target = totals.setdefault(name, dict(reads=0, bases=0))
+        for key in ('reads', 'bases'):
+            target[key] += counts[key]
+    return totals
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--threads',type=int,default=8);p.add_argument('--run',required=True);p.add_argument('bams',nargs='+');a=p.parse_args()
-    with ProcessPoolExecutor(max_workers=max(1,min(a.threads,len(a.bams)))) as pool: results=dict(pool.map(count,a.bams))
+    with ProcessPoolExecutor(max_workers=max(1,min(a.threads,len(a.bams)))) as pool: results=aggregate(pool.map(count,a.bams))
     print(json.dumps(dict(run=a.run,barcodes=results),indent=2))

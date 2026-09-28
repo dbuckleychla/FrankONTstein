@@ -57,3 +57,11 @@ Clair3 models are explicit paths rather than inferred from a `sup`/`hac` substri
 For broad copy-number callers, provide bins, GC/mappability resources and normal panels appropriate for the assay and chosen bin size (`--ichor_bin_size`, default 1 Mb; `--qdnaseq_binsize`, default 100 kb; `--delly_bin_size`, default 100 kb). These callers receive an off-target BAM; they must not be interpreted as a validated replacement for NASVAR without assay benchmarking. Preparing bins or model weights is a separate reference-preparation activity, not an implicit runtime download.
 
 References, classifier weights, panels and basecaller models are not downloaded automatically. Pin their versions in the bundle ID, retain source/license information with the bundle, and keep immutable copies for reproducible analysis.
+
+Variant-calling region restrictions use the validated `targets.bed`: bcftools
+pileup uses indexed `--regions-file`, Clair3 uses `--bed_fn`, and DeepSomatic
+uses `--regions`. Existing final target filtering remains. The BED is used as
+supplied, with zero-based half-open coordinates and no added padding; existing
+padding in an input BED cannot be inferred or removed. Unrestricted callers
+remain unrestricted. `enrichment.bed` still defines adaptive-sampling QC and
+NASVAR enrichment analysis, including off-enrichment BAM extraction for CNV.

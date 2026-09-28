@@ -4,14 +4,14 @@ Use one OCI image per tool. Docker runs those images locally and on AWS Batch; A
 
 `assets/image_sources.json` records upstream starting points. Some upstream sources use `latest`; these are **discovery inputs only**, not production locks. `bin/lock_images.py` resolves their actual registry manifest digests, failing if any lookup fails. Review and version the resulting lock for each release. The repository does not contain invented digests for unavailable images.
 
-Two small custom images are needed:
+Three custom images are needed:
 
-The source inventory includes `preprocess` and `nasvar` as `null` because those
-custom images have not been published. Supply their actual registry references
-using the required `--preprocess` and `--nasvar` arguments to `bin/lock_images.py`;
+The source inventory uses `null` discovery placeholders for custom images.
+Supply their actual registry references using the required `--preprocess`,
+`--nasvar`, and `--summary` arguments to `bin/lock_images.py`;
 these replace the null entries before resolution. The source inventory is not a
 runnable `--image_manifest`: the generated lock must contain real digest-pinned
-references. There are 13 image entries in the complete inventory. Dorado,
+references. The complete image inventory includes the selected callers and the summary renderer. Dorado,
 samtools, and pysam share the preprocessing image; methylation processing uses
 the Classy image, so these do not require separate entries.
 
@@ -19,6 +19,8 @@ the Classy image, so these do not require separate entries.
    installing dependencies with `dnf`, compiling samtools 1.21 from its release
    archive, and installing the pysam 0.23.3 wheel for BAM/reference checks.
 2. `docker/nasvar/Dockerfile`: build NASVAR with `cargo build --release --locked` from the pinned submodule, with its full non-commercial notice in the runtime layer.
+
+3. `docker/summary/Dockerfile`: extend the pinned preprocessing image with Quarto 1.7.31 and a build-time HTML smoke test.
 
 Build from the repository root after bootstrapping. Resolve the base references first with `docker buildx imagetools inspect`; use their real digests below:
 
@@ -39,17 +41,17 @@ After testing, publish the images in a registry your users can access, retaining
 
 ```bash
 python3 bin/lock_images.py --preprocess "$PREPROCESS_IMAGE" \
-  --nasvar "$NASVAR_IMAGE" --output images.lock.json
+  --nasvar "$NASVAR_IMAGE" --summary "$SUMMARY_IMAGE" --output images.lock.json
 ```
 
 The utility reads registry metadata only; it does not build, run or publish images. Override the source JSON for private mirrors or ECR. Classifier weights inside an upstream image still retain their own terms: verify redistribution rights before mirroring. For restricted weights, use an appropriately licensed private Classy image with the model layout expected by oncoseq's Classy module.
 
 ## GitHub Actions publishing to GHCR
 
-The manually triggered `Build custom analysis images` workflow publishes both
+The manually triggered `Build custom analysis images` workflow publishes all three
 custom images to `ghcr.io/<owner>/<repository>` (lowercase), which is
 `ghcr.io/dbuckleychla/frankontstein` for this repository. Tags are
-`preprocess-<git commit>` and `nasvar-<git commit>`. It does not run on pull
+`preprocess-<git commit>`, `nasvar-<git commit>`, and `summary-<git commit>`. It does not run on pull
 requests or ordinary pushes.
 
 The image-build job initializes only the pinned NASVAR source submodule. It does
@@ -87,8 +89,32 @@ been pushed; inspect the run log before retrying.
 
 The task scripts under `bin/` are staged by Nextflow. The preprocessing image supplies Python/pysam; the NASVAR image supplies Python. CPU-only execution is the default. Native ARM64 support has not been validated across upstream images.
 
-Optional `--clair3_gpu` adds Clair3's GPU flag and requests GPU access in the selected backend: Docker `--gpus all`, Apptainer `--nv`, Slurm `--gres=gpu:1` with optional `--gpu_queue`, or an AWS GPU queue. The selected image and host driver must be compatible. Other callers remain on CPU.
+Clair3 GPU execution defaults to `--clair3_gpu auto`: AWS uses a configured `--aws_gpu_queue` and reserves one GPU; Slurm uses `--gpu_queue`, `--gres=gpu:1` and Apptainer `--nv`; local Docker exposes only the NVIDIA device selected by `--basecall_device`. Without a matching queue/device, Clair3 uses CPU. `--clair3_gpu false` forces CPU, while `true` requires valid GPU configuration. The selected image and host driver must be compatible. ClairS-TO defaults to `--clairsto_gpu false` and the CPU queue because the pinned image has an indel model device-placement bug. Explicit `auto`/`true` remains available for a validated corrected image. Its pinned entrypoint has a hidden `--use_gpu` / `-g` option, verified from the exported source (it does not appear in help). The local wrapper checks CUDA-enabled PyTorch and GPU visibility before calling. Actual GPU/model inference remains unvalidated.
+
+ClairS-TO GPU mode defaults to `--clairsto_gpu_threads 1` because its entrypoint starts that many concurrent prediction workers, each loading models on the assigned GPU. The CPU allocation matches this worker budget, capped by `--max_cpus`; CPU mode retains the existing 16-CPU cap. Tune upward only after measuring GPU memory and throughput. Each scheduler task reserves one GPU. Local Docker device visibility is not exclusive scheduling across processes.
 
 ## POD5 basecalling compatibility
 
 Optional basecalling reuses the digest-pinned `preprocess` image. It requires NVIDIA/CUDA, `nvidia-smi`, and Dorado basecaller options `--device`, `--no-trim`, and `--modified-bases-models`. A runtime preflight checks the installed CLI and supplied offline model assets. No vendor gitlink, image digest or dependency version changes are required. See [model compatibility and execution settings](../documentation/basecalling.md). Container/GPU integration must be validated on NVIDIA hardware; stub tests do not establish model compatibility.
+
+DeepSomatic uses the official `google/deepsomatic:1.10.0-gpu` image pinned in
+`images.lock.json`. The inspected image includes the ONT tumor-only SavedModel,
+`model.example_info.json`, and PoN VCFs/indexes under `/opt/models/deepsomatic`.
+Its packaged entrypoint is `/opt/deepvariant/bin/deepsomatic/run_deepsomatic`.
+CPU execution uses the same image with CUDA devices hidden; automatic GPU mode
+uses the existing queue/device and reserves one GPU for the entire wrapper task.
+Actual inference validation is tracked in `documentation/deepsomatic.md`.
+
+### TODO: patched ClairS-TO container
+
+Build a derived image from the pinned ClairS-TO digest, adding
+`model_aff.to(device)` and `model_neg.to(device)` before evaluation in
+`clairs/predict.py`. Validate real GPU SNV and indel inference, publish and pin
+the corrected image digest, then restore automatic GPU routing. The current
+image leaves newly constructed indel models on CPU while inputs move to CUDA.
+No task-local source patch is applied; ClairS-TO defaults to CPU execution.
+
+The sample-summary renderer uses a separate `summary` image entry. Build
+`docker/summary/Dockerfile` (Quarto 1.7.31), verify its HTML smoke test, publish it,
+and pin the returned registry digest. The release workflow includes this build;
+`bin/lock_images.py --summary IMAGE` resolves it with the other release images.

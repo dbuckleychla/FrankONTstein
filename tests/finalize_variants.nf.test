@@ -1,0 +1,10 @@
+nextflow_pipeline {
+    name "Variant finalization sample identity and index contract (stubs only)"
+    script "finalize_variants_workflow.nf"
+    options "-stub-run"
+    test("two caller/sample tuples retain independent PASS and normalized outputs") {
+        then {
+            assert workflow.success
+        }
+    }
+}

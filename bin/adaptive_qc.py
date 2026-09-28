@@ -338,10 +338,22 @@ def main():
     for scope in ['enrichment','targets','off_enrichment']:
         if not data['alignment']['coverage']['0'][scope]['aligned_bases']: data['warnings'].append('No aligned-base coverage in '+scope)
     if not data['methylation']['genome']['combined']['sites']: data['warnings'].append('No callable primary-genome CpGs')
+    for scope in ['targets','enrichment']:
+        cov=data['alignment']['coverage']['20'][scope]
+        if cov['breadth']['10'] is not None and cov['breadth']['10'] < 0.95:
+            data['warnings'].append(f"{scope}: {cov['breadth']['10']:.1%} of bases reach 10x at MAPQ20; incomplete sensitivity, not a clinical threshold.")
+    ambiguous=[]
+    for contig in data['alignment']['contigs']:
+        for name, high in contig['targets'].get('20', {}).items():
+            low=contig['targets'].get('0', {}).get(name, {})
+            if high['mean']==0 and low.get('mean',0)>0:ambiguous.append(name)
+    if ambiguous:
+        data['warnings'].append('Coverage present at MAPQ0 but absent at MAPQ20 for targets: ' + ', '.join(ambiguous) + '. Review multimapping/alternate contigs/PAR; additional depth alone may not resolve this.')
     data['input_run'] = a.input_run or a.sample
     data['preprocessing']['input_scope'] = a.input_scope
     raw=data['preprocessing'].get('input_qc.json', {})
     data['input_yield']={'run':data['input_run'],'scope':data['preprocessing']['input_scope'],
+                         'processing_stage':raw.get('processing_stage'),
                          'reads':raw.get('reads'),'bases':raw.get('bases'),
                          'modified_read_fraction':raw.get('modified_reads',0)/raw['reads'] if raw.get('reads') else None}
     trimmed=data['preprocessing'].get('trim_qc.json')

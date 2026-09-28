@@ -25,5 +25,52 @@ unzip -q awscliv2.zip
 ./aws/install --install-dir /opt/aws-cli --bin-dir /opt/aws-cli-bin
 /opt/aws-cli/v2/current/bin/aws --version
 %{ endif ~}
+# Set before ECS registers this worker. Digest-pinned images can reuse cached
+# layers without a registry pull on every task; missing images still download.
+install -d /etc/ecs /var/log/frankontstein
+printf '\nECS_IMAGE_PULL_BEHAVIOR=once\n' >> /etc/ecs/ecs.config
+
+# AL2023 keeps Docker/kernel logs in journald. Export them automatically; no
+# interactive access is needed. Rotation prevents the diagnostic file filling disk.
+dnf install -y amazon-cloudwatch-agent logrotate
+cat > /etc/systemd/system/frankontstein-host-journal.service <<'UNIT'
+[Unit]
+Description=Persist Batch worker journal for CloudWatch
+After=systemd-journald.service
+[Service]
+ExecStart=/bin/bash -c 'exec journalctl --follow --boot --output=short-iso >> /var/log/frankontstein/host-journal.log'
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+UNIT
+cat > /etc/logrotate.d/frankontstein-host <<'ROTATE'
+/var/log/frankontstein/host-journal.log {
+    size 100M
+    rotate 2
+    copytruncate
+    missingok
+    notifempty
+}
+ROTATE
+# Bound growth during high-volume incidents rather than waiting for daily rotation.
+cat > /etc/systemd/system/frankontstein-logrotate.service <<'UNIT'
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/logrotate /etc/logrotate.d/frankontstein-host
+UNIT
+cat > /etc/systemd/system/frankontstein-logrotate.timer <<'UNIT'
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+[Install]
+WantedBy=timers.target
+UNIT
+cat > /opt/aws/amazon-cloudwatch-agent/etc/frankontstein.json <<'CONFIG'
+${host_agent_config}
+CONFIG
+systemctl daemon-reload
+systemctl enable --now frankontstein-host-journal.service frankontstein-logrotate.timer
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/frankontstein.json
 systemctl start ecs --no-block
 --FRANKONTSTEIN--

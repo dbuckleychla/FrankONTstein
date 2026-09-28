@@ -9,8 +9,8 @@ def rejects = { Closure fn ->
 }
 assert planner.resolve([:],hg38).tier == 'primary'
 assert planner.resolve([secondary:true],hg38).callers == ['nasvar']
-assert planner.resolve([tertiary:true],hg38).callers.size() == 11
-assert planner.resolve([tertiary:true],hs1).skipped*.caller == ['qdnaseq','subchrom','ichorcna']
+assert planner.resolve([tertiary:true],hg38).callers.size() == 12
+assert planner.resolve([tertiary:true],hs1).skipped*.caller == ['deepsomatic','qdnaseq','subchrom','ichorcna']
 assert planner.resolve([tertiary:true,callers:'subchrom'],hg38).callers == ['subchrom','clair3']
 assert planner.resolve([tertiary:true,callers:'nasvar,sniffles'],hs1).callers == ['nasvar','sniffles']
 rejects { planner.resolve([primary:true,secondary:true],hg38) }
@@ -54,12 +54,17 @@ assert planner.resolve([primary:'false',secondary:'true'],hg38).tier == 'seconda
 assert planner.resolve([primary:'false',secondary:'false',tertiary:'true'],hg38).tier == 'tertiary'
 rejects { planner.resolve([primary:'yes'],hg38) }
 println '3 strict-parser CLI boolean assertions passed'
-rejects { planner.resolve([trim:true], hg38) }
-rejects { planner.resolve([trim:'true',sequencing_kit:'  '], hg38) }
-assert planner.resolve([trim:false], hg38).tier == 'primary'
-assert planner.resolve([trim:'false'], hg38).tier == 'primary'
-assert planner.resolve([trim:true,sequencing_kit:'SQK-LSK114'], hg38).tier == 'primary'
-assert planner.resolve([trim:true,demux_samplesheet:'demux.csv'], hg38).tier == 'primary'
+assert planner.adapterTrimming([:])
+assert !planner.adapterTrimming([no_trim_adapter:true])
+assert !planner.adapterTrimming([no_trim_adapter:'true'])
+assert planner.adapterTrimming([no_trim_adapter:'false'])
+rejects { planner.adapterTrimming([trim:true]) }
+rejects { planner.adapterTrimming([no_trim_adapter:'yes']) }
+rejects { planner.validateAdapterTrimming([:]) }
+rejects { planner.validateAdapterTrimming([sequencing_kit:'  ']) }
+planner.validateAdapterTrimming([no_trim_adapter:true])
+planner.validateAdapterTrimming([sequencing_kit:'SQK-LSK114'])
+planner.validateAdapterTrimming([demux_samplesheet:'demux.csv'])
 rejects { planner.samples(rows, [[sample:'s2',run:'r1',kit:'',barcode:'barcode01']], true) }
 println '7 trimming kit preflight assertions passed'
 
@@ -133,3 +138,59 @@ println 'Sequencer-sheet normalization and validation contracts passed'
 def externalClair3 = 's3://example/models/r1041_e82_400bps_sup_v520_with_mv'
 assert planner.reference(shared + [basecall_model:'sup', steps:[clair3:[model:externalClair3]]], [:], '/project').models.clair3 == externalClair3
 rejects { planner.reference(shared + [basecall_model:'hac', steps:[clair3:[model:externalClair3]]], [:], '/project') }
+
+assert planner.clair3Gpu([clair3_gpu:'auto', aws_gpu_queue:'gpu'], 'aws')
+assert !planner.clair3Gpu([clair3_gpu:false, aws_gpu_queue:'gpu'], 'aws')
+assert !planner.clair3Gpu([clair3_gpu:'auto', gpu_queue:'slurm-gpu'], 'aws')
+assert planner.clair3Gpu([clair3_gpu:'auto', gpu_queue:'gpu'], 'slurm,apptainer')
+assert planner.clair3Gpu([clair3_gpu:'auto', basecall_device:'0'], 'local,docker')
+assert !planner.clair3Gpu([clair3_gpu:'auto'], 'local,docker')
+planner.validateClair3Gpu([clair3_gpu:'auto', basecall_device:'0'], 'local,docker')
+rejects { planner.validateClair3Gpu([clair3_gpu:true], 'aws') }
+rejects { planner.validateClair3Gpu([clair3_gpu:'auto', gpu_queue:'gpu'], 'slurm') }
+rejects { planner.validateClair3Gpu([clair3_gpu:'auto', basecall_device:'all'], 'local,docker') }
+
+assert planner.clairstoGpu([clairsto_gpu:'auto', clair3_gpu:false, aws_gpu_queue:'gpu'], 'aws')
+assert !planner.clairstoGpu([clairsto_gpu:false, clair3_gpu:true, aws_gpu_queue:'gpu'], 'aws')
+planner.validateClairstoGpu([clairsto_gpu:'auto', clairsto_gpu_threads:1, aws_gpu_queue:'gpu'], 'aws')
+rejects { planner.validateClairstoGpu([clairsto_gpu:true, clairsto_gpu_threads:1], 'aws') }
+rejects { planner.validateClairstoGpu([clairsto_gpu:true, clairsto_gpu_threads:0, aws_gpu_queue:'gpu'], 'aws') }
+
+assert planner.resolve([tertiary:true,callers:'deepsomatic'],hg38).callers == ['deepsomatic']
+assert !planner.resolve([tertiary:true,callers:'clair3'],hg38).callers.contains('deepsomatic')
+rejects { planner.resolve([tertiary:true,callers:'deepsomatic'],hs1) }
+rejects { planner.resolve([secondary:true,callers:'deepsomatic'],hg38) }
+assert planner.deepsomaticGpu([deepsomatic_gpu:'auto',aws_gpu_queue:'gpu'],'aws')
+assert !planner.deepsomaticGpu([deepsomatic_gpu:false,aws_gpu_queue:'gpu'],'aws')
+planner.validateDeepsomatic([deepsomatic_gpu:false,deepsomatic_cpus:8,deepsomatic_memory:'32 GB'],'local')
+rejects { planner.validateDeepsomatic([deepsomatic_gpu:true,deepsomatic_cpus:8,deepsomatic_memory:'32 GB'],'aws') }
+rejects { planner.validateDeepsomatic([deepsomatic_gpu:false,deepsomatic_cpus:0,deepsomatic_memory:'32 GB'],'local') }
+assert statusClass.summarize(['s1'],['deepsomatic'], 'name\tstatus\nTERTIARY:CALLING:DEEPSOMATIC (s1)\tFAILED\n').find { it.analysis == 'deepsomatic' }.status == 'failed'
+
+assert !planner.clairstoGpu([aws_gpu_queue:'gpu'], 'aws')
+
+assert statusClass.summarize(['s1'],['sniffles'], 'name\tstatus\nTERTIARY:CALLING:FINALIZE_VARIANTS (s1:sniffles:sv)\tFAILED\n').find { it.analysis == 'sniffles' }.status == 'failed'
+
+assert basecaller.directIdentity([bam:'a',sample_id:'s']) == 's'
+assert basecaller.directIdentity([pod5:'a',experiment_id:'run1',demux_samplesheet:'sheet']) == 'run1'
+assert basecaller.directIdentity([bam:'a',experiment_id:'run1',demux_samplesheet:'sheet']) == 'run1'
+assert basecaller.directIdentity([input:'manifest']) == null
+rejects { basecaller.directIdentity([bam:'a',sample_id:'oldrun',demux_samplesheet:'sheet']) }
+rejects { basecaller.directIdentity([bam:'a',experiment_id:'run']) }
+rejects { basecaller.directIdentity([bam:'a',demux_samplesheet:'sheet']) }
+rejects { basecaller.directIdentity([input:'manifest',experiment_id:'run']) }
+rejects { basecaller.directIdentity([bam:'a',experiment_id:'../bad',demux_samplesheet:'sheet']) }
+
+def demultiplexer = loader.parseClass(new File('lib/Demultiplexing.groovy'))
+def demuxMeta = [id:'r', kit:'kit', mappings:[[sample:'s',barcode:'barcode01']], require_moves:true]
+def shardBams = [new File('shard1/kit_barcode01.bam'), new File('shard2/kit_barcode01.bam'),new File('shard2/unclassified.bam')]
+assert demultiplexer.sampleBams(demuxMeta, shardBams)[0][1].size() == 2
+assert demultiplexer.sampleBams(demuxMeta, shardBams)[0][0] == [id:'s',kit:'kit',input_run:'r',require_moves:true]
+assert demultiplexer.sampleBams(demuxMeta, [shardBams[0]])[0][1].size() == 1
+rejects { demultiplexer.sampleBams(demuxMeta, [shardBams[2]]) }
+assert loader.parseClass(new File('lib/RunStatus.groovy')).summarize(['s'], [], 'name\tstatus\nPRIMARY:DEMULTIPLEX (r:batch_00000001)\tFAILED\n', [r:['s']]).find { it.analysis == 'alignment' }.status == 'failed'
+
+assert !planner.adapterTrimming([noTrimAdapter:true,no_trim_adapter:false])
+assert !planner.adapterTrimming(['no-trim-adapter':true,no_trim_adapter:false])
+
+assert demultiplexer.sampleBams(demuxMeta, [shardBams[2]], false) == []

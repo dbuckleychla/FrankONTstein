@@ -84,11 +84,20 @@ jobs:
           build-args: |
             RUST_IMAGE=${{ env.RUST_IMAGE }}
             RUNTIME_IMAGE=${{ env.RUNTIME_IMAGE }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/summary/Dockerfile
+          platforms: linux/amd64
+          push: true
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: ${{ env.IMAGE_ROOT }}:summary-${{ github.sha }}
       - name: Resolve release candidate image lock
         run: |
           python3 bin/lock_images.py \
             --preprocess "$IMAGE_ROOT:preprocess-$GITHUB_SHA" \
             --nasvar "$IMAGE_ROOT:nasvar-$GITHUB_SHA" \
+            --summary "$IMAGE_ROOT:summary-$GITHUB_SHA" \
             --output images.lock.json
       - uses: actions/upload-artifact@v4
         with:

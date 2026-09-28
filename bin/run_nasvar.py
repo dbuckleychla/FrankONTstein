@@ -69,6 +69,15 @@ def run(a):
     if not Path(prefix + '.report.html').is_file():
         raise RuntimeError('NASVAR report missing')
     execute(['--version'], 'nasvar/versions.txt')
+    warnings = sorted(set(line for log in Path('nasvar').glob('*.log')
+                          for line in log.read_text().splitlines()
+                          if re.search(r'\bWARN(?:ING)?\b|insufficient|keeping the first', line, re.I)))
+    limitations = ['Purity/CNV estimates require assay-matched controls; coverage-derived sex chromosomes are not a validated karyotype.']
+    if any('MAF' in line or 'blast ratio' in line for line in warnings):
+        limitations.append('Insufficient allelic evidence: do not interpret a coverage karyotype as a supported normal result.')
+    audit = dict(status='limited_evidence' if warnings else 'review_required', warnings=warnings, limitations=limitations)
+    Path('nasvar/quality_warnings.json').write_text(json.dumps(audit, indent=2) + '\n')
+    Path('nasvar/quality_warnings.txt').write_text('\n'.join(limitations + warnings) + '\n')
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()

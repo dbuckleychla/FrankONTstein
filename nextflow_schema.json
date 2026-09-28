@@ -15,10 +15,6 @@
       "type": "boolean",
       "default": false
     },
-    "trim": {
-      "type": "boolean",
-      "default": false
-    },
     "bam": {
       "type": "string",
       "minLength": 1
@@ -50,16 +46,18 @@
     },
     "image_manifest": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Digest-pinned OCI image manifest; summary (Quarto) is required in every tier."
     },
     "callers": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Explicit caller selection; consensus is automatic only when both deepsomatic and clairsto are selected. Summary HTML is generated in every tier."
     },
     "sequencing_kit": {
       "type": "string",
       "minLength": 1,
-      "description": "ONT sequencing kit; required with trim unless supplied by demux_samplesheet."
+      "description": "ONT sequencing kit; required for default adapter trimming unless supplied by demux_samplesheet or disabled with --no-trim-adapter."
     },
     "outdir": {
       "type": "string",
@@ -75,8 +73,19 @@
       ]
     },
     "clair3_gpu": {
-      "type": "boolean",
-      "default": false
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        }
+      ],
+      "default": "auto",
+      "description": "Automatically use the active profile GPU queue or local basecall_device. False forces CPU; true requires GPU configuration."
     },
     "fasta": {
       "type": "string"
@@ -178,6 +187,74 @@
       "type": "string",
       "default": "16 GB",
       "description": "Host RAM per Dorado chunk; multiplied by attempt and capped by max_memory. Not GPU VRAM."
+    },
+    "clairsto_gpu": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        }
+      ],
+      "default": false,
+      "description": "Defaults to CPU because the pinned image has a GPU indel model placement bug. Enable GPU only with a validated corrected image."
+    },
+    "clairsto_gpu_threads": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Concurrent ClairS-TO workers when using one GPU; start with one to limit VRAM use."
+    },
+    "deepsomatic_gpu": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "auto"
+          ]
+        }
+      ],
+      "default": "auto",
+      "description": "Use the active GPU queue/device for DeepSomatic; false forces CPU, true requires GPU configuration."
+    },
+    "deepsomatic_cpus": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 8,
+      "description": "DeepSomatic CPUs and example-generation shards, capped by max_cpus."
+    },
+    "deepsomatic_memory": {
+      "type": "string",
+      "default": "64 GB",
+      "description": "DeepSomatic host RAM; multiplied by attempt, capped by max_memory."
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "description": "Run label appended to AWS work/results prefixes; reuse with -resume."
+    },
+    "experiment_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "description": "Direct multiplexed BAM/POD5 run identity; must match demux sheet experiment_id. Use sample_id for singleton inputs."
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 2,
+      "description": "Maximum retries per failed process task, in addition to the initial attempt."
+    },
+    "no_trim_adapter": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable default adapter/primer trimming. Demux barcode trimming remains enabled."
     }
   },
   "required": [
@@ -342,12 +419,14 @@
     },
     {
       "if": {
-        "required": [
-          "trim"
-        ],
-        "properties": {
-          "trim": {
-            "const": true
+        "not": {
+          "required": [
+            "no_trim_adapter"
+          ],
+          "properties": {
+            "no_trim_adapter": {
+              "const": true
+            }
           }
         }
       },
@@ -413,6 +492,13 @@
             "pod5"
           ]
         }
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "trim"
+        ]
       }
     }
   ]

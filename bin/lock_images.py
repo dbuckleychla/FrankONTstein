@@ -10,10 +10,11 @@ p = argparse.ArgumentParser()
 p.add_argument('--sources', default='assets/image_sources.json')
 p.add_argument('--preprocess', required=True, help='Published custom preprocessing image')
 p.add_argument('--nasvar', required=True, help='Published NASVAR image retaining its license')
+p.add_argument('--summary', required=True, help='Published Quarto reporting image')
 p.add_argument('--output', default='images.lock.json')
 a = p.parse_args()
 images = json.loads(Path(a.sources).read_text())
-images.update(preprocess=a.preprocess, nasvar=a.nasvar)
+images.update(preprocess=a.preprocess, nasvar=a.nasvar, summary=a.summary)
 locked = {}
 for name, image in images.items():
     text = subprocess.check_output(['docker','buildx','imagetools','inspect',image], text=True)

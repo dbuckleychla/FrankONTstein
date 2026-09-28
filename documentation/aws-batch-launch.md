@@ -8,13 +8,13 @@ A helper process cannot modify its parent shell's environment. Load its output
 into your current bash/zsh session, then use your normal `nextflow run` command:
 
 ```bash
-AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py --run-id run1)" &&
+AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py)" &&
   eval "$AWS_BATCH_ENV"
 
-nextflow run . -profile aws \
+nextflow run . -profile aws --run_id run1 \
   -params-file assets/aws_batch_references.yaml \
   --primary --bam s3://YOUR_INPUT_BUCKET/run1/sample.bam \
-  --sample_id sample1 --genome hg38
+  --no-trim-adapter --sample_id sample1 --genome hg38
 ```
 
 Check that loading succeeds before starting Nextflow. The helper validates all
@@ -23,16 +23,16 @@ unsuccessful load leaves any previously loaded environment in your shell intact.
 Your AWS credentials and `AWS_PROFILE` are inherited unchanged.
 
 For multiplexed POD5, use a separate run label for the output/work directories
-and the sequencer sheet's `experiment_id` for `--sample_id`:
+(`--run_id experiment1_1h`) and the sequencer sheet's `experiment_id` for `--experiment_id`:
 
 ```bash
-AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py --run-id experiment1_1h)" &&
+AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py)" &&
   eval "$AWS_BATCH_ENV"
 
-nextflow run . -profile aws \
+nextflow run . -profile aws --run_id experiment1_1h \
   -params-file assets/aws_batch_references.yaml \
   --primary --basecall --pod5 s3://YOUR_INPUT_BUCKET/experiment1/first_hour/ \
-  --sample_id experiment1 --genome hg38 \
+  --experiment_id experiment1 --genome hg38 \
   --demux_samplesheet experiment1.csv
 ```
 
@@ -68,8 +68,8 @@ path. You can inspect the helper's output by running it without `eval`.
 | `nextflow_params.aws_job_role` | `FRANKONTSTEIN_AWS_JOB_ROLE` | `params.aws_job_role` |
 | `nextflow_params.aws_logs_group` | `FRANKONTSTEIN_AWS_LOGS_GROUP` | `params.aws_logs_group` |
 | `nextflow_params.aws_cli_path` | `FRANKONTSTEIN_AWS_CLI_PATH` | `params.aws_cli_path` |
-| `nextflow_params.outdir` + run ID | `FRANKONTSTEIN_OUTDIR` | `params.outdir` |
-| `work_dir` + run ID | `FRANKONTSTEIN_WORK_DIR` | `workDir` |
+| `nextflow_params.outdir` | `FRANKONTSTEIN_RESULTS_PREFIX` | `params.outdir = <prefix>/<run_id>` |
+| `work_dir` | `FRANKONTSTEIN_WORK_PREFIX` | `workDir = <prefix>/<run_id>` |
 
 Missing optional outputs are exported as empty strings so switching to a stack
 without a GPU queue does not retain a previously exported GPU queue. The workflow
@@ -101,8 +101,7 @@ Transfer the export to the coordinator and load it:
 
 ```bash
 AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py \
-  --terraform-outputs .aws-batch/terraform-outputs.json \
-  --run-id run1)" && eval "$AWS_BATCH_ENV"
+  --terraform-outputs .aws-batch/terraform-outputs.json)" && eval "$AWS_BATCH_ENV"
 ```
 
 The file must contain both `nextflow_params` and `work_dir` in the full
@@ -115,8 +114,8 @@ Alternatively, generate a shell file and source it:
 
 ```bash
 mkdir -p .aws-batch
-python3 bin/aws_batch_env.py --run-id run1 > .aws-batch/run1.env.sh &&
-  source .aws-batch/run1.env.sh
+python3 bin/aws_batch_env.py > .aws-batch/environment.sh &&
+  source .aws-batch/environment.sh
 ```
 
 To resume, retain the same run ID, output/work prefixes, coordinator launch
@@ -136,7 +135,7 @@ existing_aws_cli_path = "/usr/local/aws-cli/v2/current/bin/aws"
 
 Set the path to the actual self-contained CLI installation in your CPU and GPU
 AMIs. Do not assume the stock AMI contains this path. Bootstrap verifies that the
-executable runs before starting ECS; it does not install packages or download a
+executable runs before starting ECS; it does not download a
 fallback in this mode. A system Python-based CLI may depend on host libraries
 that are unavailable when mounted into task containers; use a self-contained
 installation compatible with the task images.
@@ -145,3 +144,20 @@ This setting refers to the **EC2 AMI**, not the workflow Docker image. Terraform
 exports the selected path as `aws_cli_path`; reload the environment helper after
 deploying the change. Updated bootstrap applies to newly launched instances,
 not instances already running.
+
+## Run paths belong to the Nextflow invocation
+
+Load the helper once per infrastructure environment; it exports base prefixes,
+not a run label. Supply `--run_id` to Nextflow for each run (double dash and
+underscore; `-run-id` is not a Nextflow option). With the AWS profile, the work
+and results defaults become `<work_prefix>/<run_id>` and
+`<results_prefix>/<run_id>`. Explicit `-work-dir` and `--outdir` take precedence.
+The input path and sample/experiment identity do not choose the run label.
+Other profiles retain their existing directory behavior.
+
+After upgrading, reload the helper. Old `FRANKONTSTEIN_OUTDIR` and
+`FRANKONTSTEIN_WORK_DIR` exports are no longer read. The helper no longer accepts
+`--run-id`; move that label to the Nextflow command as `--run_id`.
+
+Host diagnostics independently install the CloudWatch agent and logrotate, even
+when the AMI supplies AWS CLI. See [startup diagnostics](aws-batch-startup-diagnostics.md).

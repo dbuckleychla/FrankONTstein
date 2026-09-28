@@ -10,13 +10,13 @@ Development release: workflow routing and BAM integrity checks are tested. Conta
 | --- | --- |
 | `--primary` (default) | Alignment, comprehensive QC, CpG bedMethyl and Classy methylation classification |
 | `--secondary` | Primary plus NASVAR coverage, MAF, karyotype, CNVs, fusions and breakpoint consensus |
-| `--tertiary` | Primary plus the complete NASVAR pipeline and compatible oncoseq callers |
+| `--tertiary` | Primary plus the complete NASVAR pipeline and compatible variant callers, including hg38 DeepSomatic |
 
 Task names preserve analysis hierarchy: `PRIMARY:ALIGN` and `PRIMARY:CLASSY_COMBINED`
 in all modes; `SECONDARY:NASVAR` in secondary mode; `TERTIARY:NASVAR` and
 `TERTIARY:CALLING:...` in tertiary mode. Shared publishing uses `REPORTING:...`.
 
-Choose at most one tier. Tertiary exposes `nasvar,bcftools,clair3,clairsto,sniffles,severus,stellerator,qdnaseq,delly,subchrom,ichorcna`. Use `--callers nasvar,sniffles` to narrow its defaults. Selecting SubChrom adds its Clair3 prerequisite. Secondary permits only NASVAR; primary has no variant callers. Classy remains enabled in all tiers.
+Choose at most one tier. Tertiary exposes `nasvar,bcftools,clair3,clairsto,deepsomatic,sniffles,severus,stellerator,qdnaseq,delly,subchrom,ichorcna`. Use `--callers nasvar,sniffles` to narrow its defaults. DeepSomatic is a default on hg38 only and runs independently of the other callers. Selecting SubChrom adds its Clair3 prerequisite. Secondary permits only NASVAR; primary has no variant callers. Classy remains enabled in all tiers.
 
 Both **hg38/GRCh38** and **hs1/CHM13** are supported reference choices. CHM13 defaults exclude QDNAseq, SubChrom and ichorCNA; explicitly selecting one fails. Other caller assets must match the exact assembly version in your bundle.
 
@@ -27,17 +27,17 @@ validation gates alignment; input preparation can run alongside it.
 
 ```mermaid
 flowchart TD
-    I["Unaligned BAMs: single sample or manifest"] --> P["PRIMARY:PREPARE_BAM<br/>Merge chunks and validate modified-base tags"]
+    I["Unaligned BAMs or Dorado shards"] --> D{"Demultiplex?"}
     R["FASTA + index, targets BED, enrichment BED"] --> V["PRIMARY:VALIDATE_REFERENCE"]
-    P --> D{"Demultiplex?"}
     S["Demultiplex samplesheet"] -.-> D
-    D -->|Yes| DX["PRIMARY:DEMULTIPLEX"]
+    D -->|Yes| DX["PRIMARY:DEMULTIPLEX<br/>Parallel per input BAM/shard"]
     DX --> U["Unclassified BAM output"]
-    DX --> T{"Trim?"}
+    DX --> T{"Adapter trim? (default yes)"}
     D -->|No| T
-    T -->|Yes: sequencing kit required| TR["PRIMARY:TRIM_BAM<br/>Dorado trim and tag validation"]
-    T -->|No| A["PRIMARY:ALIGN<br/>Dorado alignment, sort, index and QC"]
-    TR --> A
+    T -->|Yes| TR["PRIMARY:TRIM_BAM<br/>Parallel per BAM/shard"]
+    T -->|--no-trim-adapter| P["PRIMARY:PREPARE_BAM<br/>Merge by sample; bounded BAM checks"]
+    TR --> P
+    P --> A["PRIMARY:ALIGN<br/>Dorado alignment, sort, index and QC"]
     V --> A
     A --> BED["MODKIT_PILEUP + INDEX_BEDMETHYL<br/>CpG bedMethyl"]
     BED --> QC["SAMPLE_QC: enabled by default"]
@@ -184,7 +184,7 @@ are top-level parameters in the file; analysis-specific assets live under
 
 ```bash
 nextflow run . -profile local,docker -params-file references.yaml \
-  --bam /data/sample.ubam --genome hg38 --sample_id sample1 \
+  --bam /data/sample.ubam --genome hg38 --no-trim-adapter --sample_id sample1 \
   --secondary --outdir results/sample1
 ```
 
@@ -206,7 +206,7 @@ Both BED inputs are **required in every tier**:
 
 ```bash
 nextflow run . -profile local,docker \
-  --bam /data/sample.ubam --sample_id sample1 \
+  --bam /data/sample.ubam --no-trim-adapter --sample_id sample1 \
   --reference_bundle /references/hg38/bundle.json \
   --enrichment_bed /panels/enrichment.bed --targets_bed /panels/targets.bed \
   --image_manifest images.lock.json --secondary --outdir results
@@ -214,13 +214,7 @@ nextflow run . -profile local,docker \
 
 For optional GPU POD5 input, see [basecalling](documentation/basecalling.md). Singleton and multiplexed POD5 runs feed into the same analysis tiers.
 
-Input BAMs must be **unaligned**, basecalled with modified-base calls, and contain valid MM/ML tags. The workflow validates these tags, aligns through Dorado's minimap2-backed aligner, and validates the aligned BAM's modification encoding. Missing tags and stale MN coordinates fail; ordinary FASTQ conversion is not used. Alignment does not perform an exhaustive input/output read comparison or create a SQLite database.
-
-`check_bam.py` uses each task's allocated CPUs for bounded parallel MM/ML decoding,
-with one BAM reader and the remaining CPUs as workers. Every read is checked;
-no sampling is used. For standalone checks, use
-`python3 bin/check_bam.py sample.bam --unaligned --threads 8`.
-The default standalone setting (`--threads 1`) keeps serial execution.
+Input BAMs must be **unaligned** and basecalled with modified-base calls. BAM checks now use quickcheck plus at most 1,000 reads for tag presence/header sanity. Modification arrays, MN coordinates and move-table values are trusted, not decoded or exhaustively checked. Methylation tools validate the data they consume. Sampled totals are labeled and never reported as full input yield. The workflow preserves read-group IDs and read-level tags while setting each aligned BAM's read-group sample names to its sample ID.
 
 For multiple samples or BAM chunks, replace `--bam/--sample_id` with `--input samples.csv`:
 
@@ -241,14 +235,14 @@ run1,SQK-NBD114-24,barcode01,sample1
 run1,SQK-NBD114-24,barcode02,sample2
 ```
 
-`experiment_id` must match the input manifest’s `run` (or `--sample_id` for a direct pooled BAM/POD5 input). `alias` determines output sample names; the sequencer’s `sample_id` does not override it. Only `experiment_id`, `kit`, `barcode`, and `alias` are required. Other columns, including `position_id`, `flow_cell_id`, `sample_id`, `flow_cell_product_code`, and `type`, are optional and ignored for routing. See [the full sequencer-sheet example](assets/demux.csv). Older `run,kit,barcode,sample` demux sheets must rename `run` to `experiment_id` and `sample` to `alias`.
+`experiment_id` must match the input manifest’s `run` (or `--experiment_id` for a direct pooled BAM/POD5 input). `alias` determines output sample names; the sequencer’s `sample_id` does not override it. Only `experiment_id`, `kit`, `barcode`, and `alias` are required. Other columns, including `position_id`, `flow_cell_id`, `sample_id`, `flow_cell_product_code`, and `type`, are optional and ignored for routing. See [the full sequencer-sheet example](assets/demux.csv). Older `run,kit,barcode,sample` demux sheets must rename `run` to `experiment_id` and `sample` to `alias`.
 
 Every run must have one kit and unique barcode-to-sample mappings. A sample may occur only once in the demultiplexing sheet in this release. Unclassified BAMs are retained under `demultiplex/`. A requested barcode with no output or no modification-tagged reads fails explicitly; it is never silently reassigned to another sample.
 
-Demultiplexing precedes trimming. Add `--trim --sequencing_kit KIT_NAME` for
-Dorado trimming. With `--demux_samplesheet`, the kit comes from each run's `kit`
+Demultiplexing precedes adapter/primer trimming, which is on by default.
+Supply `--sequencing_kit KIT_NAME` for singleton inputs. With `--demux_samplesheet`, the kit comes from each run's `kit`
 column instead. Preflight rejects trimming without a kit before analysis starts.
-Trimming is off by default. Data basecalled with barcodes already removed may not
+Use `--no-trim-adapter` to skip adapter/primer trimming; demux still trims barcodes. Data basecalled with barcodes already removed may not
 be demultiplexable.
 
 ## Execution and outputs
@@ -259,15 +253,9 @@ be demultiplexable.
 
 Use `-c site.config` for site resource overrides. Processes use CPU execution by default; optional POD5 basecalling requires explicit GPU configuration. Do not assign GPUs to Dorado demux/trim/align merely because Dorado also supports GPU basecalling.
 
-Alignment, Clair3, ClairS-TO, Sniffles, Severus and Stellerator request 16 CPUs
-and 32 GB by default. Classy requests 8 CPUs/8 GB; NASVAR requests 8 CPUs/32 GB.
-Requests respect `--max_cpus` and `--max_memory`; memory can increase on retry.
-These resource tiers do not change the configured Slurm/AWS queue. NASVAR's CPU
-allocation does not imply that every subcommand uses all eight cores.
-Other processes retain their defaults; bcftools compression threads do not make
-its core variant-calling computation fully parallel.
+Alignment requests **32 CPUs / 64 GB** (2 GB per requested CPU before independent global caps); the global CPU cap defaults to 32. Clair3/ClairS-TO retain 16 CPUs/32 GB. Classy and modkit use 8 CPUs/16 GB, NASVAR 2 CPUs/8 GB, sample QC 16 CPUs/4 GB, and DeepSomatic 8 CPUs/64 GB. Serial and short tasks have smaller allocations; see `conf/modules.config`. Limits and retry caps still apply. Dorado basecalling remains one GPU per task; CPU-only preprocessing remains on CPU queues.
 
-Outputs include per-sample `alignment/`, `methylation/classy/` and caller directories; caller-specific JSON/VCF/BCF/plots; `index.html`; `manifest.json`; and `pipeline_info/` with task status, trace, versions and execution reports. NASVAR outputs go directly under `<sample>/nasvar/`, with no duplicate under `variants/`. ichorCNA and SubChrom outputs likewise sit directly under their caller directories. Alignment includes flagstat QC; demultiplexed BAMs sit under `demultiplex/<run>/`. NASVAR's native JSON and HTML are preserved. Small-variant VCFs are also restricted to `--targets_bed` and indexed; raw caller VCFs remain available. The workflow does not merge competing callers into consensus calls.
+Outputs include per-sample `alignment/`, `methylation/classy/` and caller directories; caller-specific JSON/VCF/BCF/plots; `index.html`; `manifest.json`; and `pipeline_info/` with task status, trace, versions and execution reports. NASVAR outputs go directly under `<sample>/nasvar/`, with no duplicate under `variants/`. ichorCNA and SubChrom outputs likewise sit directly under their caller directories. Alignment includes index-derived idxstats (full flagstat scan removed); demultiplexed BAMs sit under `demultiplex/<run>/<shard>/`. NASVAR's native JSON and HTML are preserved. Small-variant VCFs are also restricted to `--targets_bed` and indexed; raw caller VCFs remain available. All VCF/BCF callers also emit indexed sample-normalized copies and separate exact-PASS subsets when filter values are assessed. Original target-filtered files remain available. All-dot FILTER inputs get a not-applicable report rather than invented PASS calls. See [output filtering](documentation/variant-output-filtering.md). An independent step emits NASVAR-query somatic candidate consensus only when both DeepSomatic and ClairS-TO agree with exact PASS alleles. All tiers also emit a per-sample offline Quarto summary. See [consensus and summaries](documentation/consensus-summary.md).
 
 QDNAseq, Delly and ichorCNA use reads not overlapping enrichment regions for broad CNV analysis. SubChrom uses its panel mode, your panel bins, and Clair3 output. These supplementary results need assay-specific validation; NASVAR is the primary adaptive-sampling analysis.
 
@@ -275,7 +263,7 @@ Resume with the same inputs, image lock, working directory and `.nextflow/` stat
 
 ```bash
 nextflow run . -resume -profile local,docker -params-file references.yaml \
-  --bam /data/sample.ubam --genome hg38 --sample_id sample1 \
+  --bam /data/sample.ubam --genome hg38 --no-trim-adapter --sample_id sample1 \
   --secondary --outdir results/sample1
 ```
 
@@ -300,3 +288,7 @@ See [AGENTS.md](AGENTS.md) for module interfaces and dependency-update rules. Ad
 Original workflow code is MIT. **NASVAR is non-commercial**, including when redistributed in a container; its full notice is retained in `licenses/NASVAR.txt`. Upstream modules, tools, models and reference assets retain their own terms. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Clair3 uses bundled models selected by `--basecall_model sup|hac|fast` (default `sup`), also configurable as `basecall_model: sup` in the params YAML. Following oncoseq, SUP selects `/opt/models/r1041_e82_400bps_sup_v500`; HAC and FAST select `/opt/models/r1041_e82_400bps_hac_v500`. These assume R10.4.1 E8.2, 400 bps data. No external model path is required; old `steps.clair3.model` entries are ignored.
+
+Variant results are grouped by `germline`, `somatic`, `structural`, and `CNA`,
+then caller, under each sample. Published sample filenames include the sample ID.
+See [output layout and filtering](documentation/variant-output-filtering.md#published-layout).

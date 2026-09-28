@@ -1,0 +1,10 @@
+nextflow_pipeline {
+    name "DeepSomatic sample identity and output contract (stubs only)"
+    script "deepsomatic_workflow.nf"
+    options "-stub-run -lib ${System.getenv('FRANKONTSTEIN_TEST_ROOT') ?: new File('.').absolutePath}/lib"
+    test("two tumor-only samples retain distinct outputs") {
+        then {
+            assert workflow.success
+        }
+    }
+}

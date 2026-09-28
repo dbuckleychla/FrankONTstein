@@ -8,14 +8,17 @@ process OFF_TARGET_BAM {
     tuple val(meta), path(bam), path(bai)
     path assets
     output:
+    tuple val(meta), path('runtime_logs/*'), emit: logs
     tuple val(meta), path('offtarget.bam'), path('offtarget.bam.bai'), emit: bam
     script:
     """
+    source capture_task_logs.sh OFF_TARGET_BAM
     samtools view -@ ${task.cpus - 1} -b -L '${assets}/enrichment.bed' -U offtarget.bam -o /dev/null '${bam}'
     samtools index -@ ${task.cpus - 1} offtarget.bam
     """
     stub:
     """
+    source capture_task_logs.sh OFF_TARGET_BAM
     touch offtarget.bam offtarget.bam.bai
     """
 
@@ -30,23 +33,26 @@ process CLAIR3 {
     path assets
     path external_model, stageAs: 'models/clair3/*'
     output:
+    tuple val(meta), path('runtime_logs/*'), emit: logs
     tuple val(meta), path('clair3/merge_output.vcf.gz'), emit: vcf
     path 'versions.yml', emit: versions
     script:
     def model = external_model ?: WorkflowPlan.clair3Model(params.basecall_model)
     def moves = model.toString().endsWith('_with_mv')
-    def moveCheck = moves ? "run_clair3.sh --help > clair3.help.txt 2>&1; grep -q -- '--enable_move_table' clair3.help.txt || { echo 'Pinned Clair3 runtime lacks --enable_move_table support' >&2; exit 1; }" : ''
+    def moveCheck = moves ? "run_clair3.sh --help > clair3.help.txt 2>&1; grep -q -- '--enable_dwell_time' clair3.help.txt || { echo 'Pinned Clair3 runtime lacks --enable_dwell_time support' >&2; exit 1; }" : ''
     """
+    source capture_task_logs.sh CLAIR3
     ${moveCheck}
     test -s '${model}/pileup.pt' || { echo 'Clair3 image is missing the selected ${params.basecall_model} pileup model' >&2; exit 1; }
     test -s '${model}/full_alignment.pt' || { echo 'Clair3 image is missing the selected ${params.basecall_model} full-alignment model' >&2; exit 1; }
     run_clair3.sh --threads=${task.cpus} --sample_name='${meta.id}' \
-      --platform=ont --model_path='${model}' ${moves ? '--enable_move_table' : ''} --bam_fn='${bam}' --ref_fn='${fasta}' \
-      --bed_fn='${assets}/enrichment.bed' --output=clair3 ${params.clair3_gpu.toString().toBoolean() ? '--use_gpu' : ''}
+      --platform=ont --model_path='${model}' ${moves ? '--enable_dwell_time' : ''} --bam_fn='${bam}' --ref_fn='${fasta}' \
+      --bed_fn='${assets}/targets.bed' --output=clair3 ${WorkflowPlan.clair3Gpu(params as Map, workflow.profile) ? '--use_gpu' : ''}
     run_clair3.sh --version > versions.yml 2>&1
     """
     stub:
     """
+    source capture_task_logs.sh CLAIR3
     mkdir clair3
     touch clair3/merge_output.vcf.gz
     echo 'clair3: stub' > versions.yml
@@ -61,17 +67,20 @@ process DELLY {
     tuple path(fasta), path(fai), val(validated)
     path mappability
     output:
+    tuple val(meta), path('runtime_logs/*'), emit: logs
     tuple val(meta), path('delly.bcf'), emit: bcf
     tuple val(meta), path('delly.cov.gz'), emit: coverage
     path 'versions.yml', emit: versions
     script:
     """
+    source capture_task_logs.sh DELLY
     delly cnv -g '${fasta}' -m '${mappability}' -i ${params.delly_bin_size} \
       -w ${params.delly_bin_size} -c delly.cov.gz -o delly.bcf -s delly.stats.gz '${bam}'
     delly -v > versions.yml 2>&1
     """
     stub:
     """
+    source capture_task_logs.sh DELLY
     touch delly.bcf delly.cov.gz
     echo 'delly: stub' > versions.yml
     """
@@ -85,10 +94,12 @@ process SUBCHROM {
     tuple path(fasta), path(fai), val(validated)
     path panel_bin
     output:
+    tuple val(meta), path('runtime_logs/*'), emit: logs
     tuple val(meta), path("${meta.id}.panel.SubChrom"), emit: results
     path 'versions.yml', emit: versions
     script:
     """
+    source capture_task_logs.sh SUBCHROM
     mkdir -p '${meta.id}.panel.SubChrom'
     cp -L '${vcf}' '${meta.id}.panel.SubChrom/${meta.id}.panel.gatkHC.vcf.gz'
     # SubChrom changes directory internally; resolve inputs before invoking it.
@@ -100,6 +111,7 @@ process SUBCHROM {
     """
     stub:
     """
+    source capture_task_logs.sh SUBCHROM
     mkdir '${meta.id}.panel.SubChrom'
     touch '${meta.id}.panel.SubChrom/cnv.png'
     echo 'subchrom: stub' > versions.yml
@@ -117,10 +129,12 @@ process ICHORCNA {
     path normal_panel, stageAs:'ichor.panel.rds'
     path seqinfo, stageAs:'ichor.seqinfo.RData'
     output:
+    tuple val(meta), path('runtime_logs/*'), emit: logs
     tuple val(meta), path('ichorcna'), emit: results
     path 'versions.yml', emit: versions
     script:
     """
+    source capture_task_logs.sh ICHORCNA
     mkdir ichorcna
     Rscript /opt/ichorCNA/scripts/runIchorCNA.R --id '${meta.id}' --WIG '${wig}' \
       --ploidy 'c(2,3)' --normal 'c(0.5,0.7,0.9)' --maxCN 5 \
@@ -133,6 +147,7 @@ process ICHORCNA {
     """
     stub:
     """
+    source capture_task_logs.sh ICHORCNA
     mkdir ichorcna
     touch ichorcna/cnv.pdf
     echo 'ichorcna: stub' > versions.yml
@@ -146,10 +161,12 @@ process HMMCOPY_WIG {
     input:
     tuple val(meta), path(bam), path(bai), val(window), val(min_mapq)
     output:
+    tuple val(meta), path('runtime_logs/*'), emit: logs
     tuple val(meta), path('coverage.wig'), emit: wig
     path 'versions.yml', emit: versions
     script:
     """
+    source capture_task_logs.sh HMMCOPY_WIG
     /opt/hmmcopy_utils/bin/readCounter --window ${window} --quality ${min_mapq} \
       -c chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22,chrX,chrY \
       '${bam}' > coverage.wig
@@ -157,6 +174,7 @@ process HMMCOPY_WIG {
     """
     stub:
     """
+    source capture_task_logs.sh HMMCOPY_WIG
     touch coverage.wig
     echo 'hmmcopy: stub' > versions.yml
     """

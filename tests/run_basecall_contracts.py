@@ -29,13 +29,13 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-basecall-') as scratch:
     subprocess.run(['python3', 'tests/make_contract_tools.py', str(scratch / 'tools')], cwd=root, check=True)
     env = dict(os.environ, NXF_SYNTAX_PARSER='v2', PATH=str(scratch / 'tools') + os.pathsep + os.environ['PATH'])
     base = command + ['run', '.', '-stub-run', '-profile', 'local,docker', '-c', str(config), '-ansi-log', 'false',
-                      '--basecall', '--basecall_device', '0', '--max_cpus', '2', '--max_memory', '1 GB',
+                      '--basecall', '--basecall_device', '0', '--sequencing_kit','SQK-LSK114','--max_cpus', '2', '--max_memory', '1 GB',
                       '--reference_bundle', 'tests/fixtures/bundle.json', '--targets_bed', 'tests/fixtures/regions.bed',
                       '--enrichment_bed', 'tests/fixtures/regions.bed', '--image_manifest', 'tests/fixtures/images.json',
                       '-params-file', str(params)]
     cases = [
         ('primary', ['--pod5', str(scratch / 'raw'), '--sample_id', 'sample1', '--basecall_tasks', '2', '--basecall_max_forks', '1'], ['sample1'], 2),
-        ('secondary', ['--input', str(manifest), '--demux_samplesheet', 'tests/fixtures/demux.csv', '--trim'], ['sample1', 'sample2'], 3),
+        ('secondary', ['--pod5', str(scratch / 'raw'), '--experiment_id', 'run1', '--demux_samplesheet', 'tests/fixtures/demux.csv'], ['sample1', 'sample2'], 3),
         ('tertiary', ['--pod5', str(scratch / 'raw/a.pod5'), '--sample_id', 'sample1', '--disable_qc', 'true'], ['sample1'], 1),
     ]
     for tier, extra, samples, batches in cases:
@@ -43,6 +43,13 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-basecall-') as scratch:
         args = base + ['--' + tier, '--outdir', str(out), '-work-dir', str(scratch / (tier + '-work'))] + extra
         subprocess.run(args, cwd=root, env=env, check=True)
         result = json.loads((out / 'manifest.json').read_text())
+        if '--demux_samplesheet' in extra:
+            assert len(list((out/'demultiplex/run1').glob('batch_*'))) == batches
+            with (out/'pipeline_info/trace.tsv').open() as handle:
+                task_names = [r['name'] for r in csv.DictReader(handle, delimiter='\t')]
+            assert len([n for n in task_names if ':DEMULTIPLEX (' in n]) == batches
+            assert len([n for n in task_names if ':PREPARE_BAM (' in n]) == len(samples)
+
         records = [r for r in result['analyses'] if r['analysis'] == 'basecalling']
         assert sorted(r['sample'] for r in records) == samples, records
         assert all(r['status'] == 'completed' and all((out / f).exists() for f in r['files']) for r in records)
@@ -52,7 +59,8 @@ with tempfile.TemporaryDirectory(prefix='frankontstein-basecall-') as scratch:
         with (out / 'pipeline_info/trace.tsv').open() as f:
             trace = list(csv.DictReader(f, delimiter='\t'))
         assert sum('DORADO_BASECALL (' in r['name'] for r in trace) == batches, trace
-        assert sum('PREPARE_BAM (' in r['name'] for r in trace) == 1
+        assert sum('TRIM_BAM (' in r['name'] for r in trace) == batches * len(samples), trace
+        assert sum('PREPARE_BAM (' in r['name'] for r in trace) == len(samples)
         subprocess.run(args + ['-resume', result['run']['session_id']], cwd=root, env=env, check=True)
         with (out / 'pipeline_info/trace.tsv').open() as f:
             trace = list(csv.DictReader(f, delimiter='\t'))

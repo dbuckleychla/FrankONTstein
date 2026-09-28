@@ -61,3 +61,23 @@ run "reject_bucket_url" {
   variables { bucket_name = "s3://existing-test-bucket" }
   expect_failures = [var.bucket_name]
 }
+run "worker_diagnostics_and_storage" {
+  command = plan
+  variables { gpu_instance_types = ["g6e"] }
+  assert {
+    condition     = aws_launch_template.batch.block_device_mappings[0].ebs[0].iops == 6000 && aws_launch_template.batch.block_device_mappings[0].ebs[0].throughput == 500
+    error_message = "CPU/GPU shared launch template must provision explicit gp3 performance."
+  }
+  assert {
+    condition     = aws_cloudwatch_log_group.hosts.retention_in_days == var.log_retention_days
+    error_message = "Host logs must retain diagnostics after worker termination."
+  }
+}
+run "reject_disk_ratio" {
+  command = plan
+  variables {
+    scratch_iops             = 3000
+    scratch_throughput_mibps = 1000
+  }
+  expect_failures = [var.scratch_throughput_mibps]
+}

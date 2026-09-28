@@ -53,13 +53,13 @@ After an account owner applies the reviewed infrastructure, load its AWS setting
 into your shell and run Nextflow directly:
 
 ```bash
-AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py --run-id run1)" &&
+AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py)" &&
   eval "$AWS_BATCH_ENV"
 
-nextflow run . -profile aws \
+nextflow run . -profile aws --run_id run1 \
   -params-file assets/aws_batch_references.yaml \
   --primary --bam s3://YOUR_INPUT_BUCKET/run1/sample.bam \
-  --sample_id sample1 --genome hg38
+  --no-trim-adapter --sample_id sample1 --genome hg38
 ```
 
 Run from the workflow checkout with your authorized `AWS_PROFILE` selected.
@@ -73,10 +73,12 @@ Use a persistent coordinator (for example, a managed server with tmux/systemd) a
 
 No live AWS resources were created during implementation. Before claiming this backend validated, run the real primary fixture, a secondary/tertiary fixture, an interrupted/resumed run, and both managed-network and existing-network plans in an actual test account.
 
-For optional Clair3 GPU execution, set `gpu_instance_types = ["g5"]` to create a separate NVIDIA Batch environment/queue, then launch with `--clair3_gpu`. CPU-only remains the default. GPU resources scale to zero and use on-demand capacity independently of the CPU Spot setting. The chosen Clair3 image must include compatible GPU dependencies; this path requires its own hardware validation.
+For optional Clair3 GPU execution, set `gpu_instance_types = ["g5"]` to create a separate NVIDIA Batch environment/queue, and set `--aws_gpu_queue` (or load it through the environment helper). Clair3 automatically uses that queue and requests one GPU. Without a GPU queue it uses CPU; `--clair3_gpu false` explicitly forces CPU. GPU resources scale to zero and use on-demand capacity independently of the CPU Spot setting. The chosen Clair3 image must include compatible GPU dependencies; this path requires its own hardware validation.
 
 Offline storage contract tests use the mocked AWS provider: `terraform test`
 from `terraform/aws` (no AWS deployment). They cover the default/custom prefixes
 and reject root/parent prefixes and bucket URLs.
 
 The same optional GPU queue supports POD5 basecalling with `--basecall --aws_gpu_queue GPU_QUEUE`. Basecalling requests one accelerator per task; merge/demultiplex/alignment remain on the CPU queue. See [basecalling](../documentation/basecalling.md). No infrastructure changes or Terraform apply are needed when an appropriate GPU queue already exists.
+
+For recurring Docker creation timeouts, see [startup diagnostics without SSH/SSM](../documentation/aws-batch-startup-diagnostics.md).

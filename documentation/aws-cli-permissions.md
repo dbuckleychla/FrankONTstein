@@ -280,3 +280,12 @@ repos attach existing AWS-managed policies, including `AmazonS3FullAccess`,
 which avoids these custom-policy creations but broadens data access and does
 not replace this coordinator policy. Do not switch to that pattern solely to
 circumvent a denied IAM operation.
+
+## Worker startup diagnostics
+
+See [startup diagnostics](aws-batch-startup-diagnostics.md) for the read-only
+collector permissions and new worker inline policy. Deployment requires
+`iam:PutRolePolicy`, `iam:GetRolePolicy`, and `iam:DeleteRolePolicy` on the worker
+role plus log-group lifecycle permissions. The worker receives scoped log-stream
+write permissions and `cloudwatch:PutMetricData` limited to the
+`FrankONTstein/BatchHost` namespace; no SSM connectivity is required.

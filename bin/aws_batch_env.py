@@ -3,7 +3,6 @@
 import argparse
 import json
 from pathlib import Path
-import re
 import shlex
 import subprocess
 import sys
@@ -39,9 +38,7 @@ def s3_prefix(value, name):
     return value.rstrip('/')
 
 
-def build_environment(outputs, run_id):
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', run_id):
-        raise ValueError('--run-id must start with a letter/digit and contain only letters, digits, dots, underscores or hyphens')
+def build_environment(outputs):
     if not isinstance(outputs, dict):
         raise ValueError('Terraform outputs must be a JSON object')
     params = setting(outputs, 'nextflow_params')
@@ -59,8 +56,8 @@ def build_environment(outputs, run_id):
             raise ValueError(f'Terraform nextflow_params.{name} must be a nonempty string or null')
         # Explicit empty exports clear values left by a previous stack/session.
         environment['FRANKONTSTEIN_' + name.upper()] = value or ''
-    environment['FRANKONTSTEIN_OUTDIR'] = f'{out}/{run_id}'
-    environment['FRANKONTSTEIN_WORK_DIR'] = f'{work}/{run_id}'
+    environment['FRANKONTSTEIN_RESULTS_PREFIX'] = out
+    environment['FRANKONTSTEIN_WORK_PREFIX'] = work
     return environment
 
 
@@ -70,9 +67,8 @@ def shell_exports(environment):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, epilog=(
-        'Load into bash/zsh with: AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py --run-id run1)" '
+        'Load into bash/zsh with: AWS_BATCH_ENV="$(python3 bin/aws_batch_env.py)" '
         '&& eval "$AWS_BATCH_ENV". Or redirect stdout to a file and source it.'))
-    parser.add_argument('--run-id', required=True, help='Suffix for Terraform output/work prefixes; reuse it with -resume')
     parser.add_argument('--terraform-dir', type=Path, default=ROOT / 'terraform/aws',
                         help='Initialized Terraform directory with the intended state/workspace')
     parser.add_argument('--terraform-outputs', type=Path,
@@ -80,7 +76,7 @@ def main():
     args = parser.parse_args()
     try:
         outputs = read_outputs(args.terraform_dir, args.terraform_outputs)
-        environment = build_environment(outputs, args.run_id)
+        environment = build_environment(outputs)
         # Stdout is exclusively shell-safe exports. A child cannot set its parent's environment.
         print(shell_exports(environment), end='')
     except subprocess.CalledProcessError as error:

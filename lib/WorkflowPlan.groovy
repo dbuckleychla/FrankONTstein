@@ -1,9 +1,67 @@
 import groovy.json.JsonSlurper
 
 class WorkflowPlan {
+    static void validateRunId(Map params, boolean usesPrefixes) {
+        if (usesPrefixes && !params.run_id) throw new IllegalArgumentException('AWS prefix defaults require --run_id (specified on the Nextflow invocation)')
+        if (params.run_id != null && !(params.run_id.toString() ==~ /[A-Za-z0-9][A-Za-z0-9_.-]*/))
+            throw new IllegalArgumentException('--run_id must start with a letter/digit and contain only letters, digits, dots, underscores or hyphens')
+    }
+
+    static boolean clair3Gpu(Map p, String profiles) {
+        def value = p.clair3_gpu == null ? 'auto' : p.clair3_gpu.toString()
+        if (!(value in ['auto', 'true', 'false']))
+            throw new IllegalArgumentException('--clair3_gpu must be auto, true or false')
+        def selected = profiles.tokenize(',')
+        def configured = selected.contains('aws') ? p.aws_gpu_queue : selected.contains('slurm') ? p.gpu_queue : p.basecall_device
+        return value == 'auto' ? configured != null && configured.toString() != '' : value.toBoolean()
+    }
+
+    static void validateClair3Gpu(Map p, String profiles) {
+        if (!clair3Gpu(p, profiles)) return
+        def selected = profiles.tokenize(',')
+        if (selected.contains('aws')) {
+            if (!p.aws_gpu_queue) throw new IllegalArgumentException('Clair3 GPU execution requires --aws_gpu_queue')
+        } else if (selected.contains('slurm')) {
+            if (!p.gpu_queue || !selected.contains('apptainer'))
+                throw new IllegalArgumentException('Clair3 GPU execution requires --gpu_queue and -profile slurm,apptainer')
+        } else if (!selected.contains('docker') || !(p.basecall_device?.toString() ==~ /(?:[0-9]+|GPU-[a-fA-F0-9-]+)/)) {
+            throw new IllegalArgumentException('Local Clair3 GPU execution requires -profile local,docker and --basecall_device NVIDIA_INDEX_OR_UUID')
+        }
+    }
+
+    static boolean clairstoGpu(Map p, String profiles) {
+        clair3Gpu(p + [clair3_gpu:p.clairsto_gpu == null ? false : p.clairsto_gpu], profiles)
+    }
+
+    static void validateClairstoGpu(Map p, String profiles) {
+        try {
+            validateClair3Gpu(p + [clair3_gpu:p.clairsto_gpu == null ? false : p.clairsto_gpu], profiles)
+        } catch (IllegalArgumentException fault) {
+            throw new IllegalArgumentException(fault.message.replace('Clair3', 'ClairS-TO').replace('clair3_gpu', 'clairsto_gpu'))
+        }
+        if (clairstoGpu(p, profiles) && !(p.clairsto_gpu_threads?.toString() ==~ /[1-9][0-9]*/))
+            throw new IllegalArgumentException('--clairsto_gpu_threads must be a positive integer')
+    }
+
+    static boolean deepsomaticGpu(Map p, String profiles) {
+        clair3Gpu(p + [clair3_gpu:p.deepsomatic_gpu == null ? 'auto' : p.deepsomatic_gpu], profiles)
+    }
+
+    static void validateDeepsomatic(Map p, String profiles) {
+        try {
+            validateClair3Gpu(p + [clair3_gpu:p.deepsomatic_gpu == null ? 'auto' : p.deepsomatic_gpu], profiles)
+        } catch (IllegalArgumentException fault) {
+            throw new IllegalArgumentException(fault.message.replace('Clair3', 'DeepSomatic').replace('clair3_gpu', 'deepsomatic_gpu'))
+        }
+        if (!(p.deepsomatic_cpus?.toString() ==~ /[1-9][0-9]*/))
+            throw new IllegalArgumentException('--deepsomatic_cpus must be a positive integer')
+        if ((p.deepsomatic_memory as nextflow.util.MemoryUnit).toBytes() <= 0)
+            throw new IllegalArgumentException('--deepsomatic_memory must be positive')
+    }
+
     static void validateAws(Map params, java.nio.file.Path workDir) {
         def missing = ['aws_queue', 'aws_region', 'aws_job_role'].findAll { !params[it] }.collect { "--${it}" }
-        if (workDir.toUri().scheme != 's3') missing.add('-work-dir s3://... (or FRANKONTSTEIN_WORK_DIR)')
+        if (workDir.toUri().scheme != 's3') missing.add('-work-dir s3://... (or FRANKONTSTEIN_WORK_PREFIX + --run_id)')
         if (missing) throw new IllegalArgumentException("AWS requires: ${missing.join(', ')}")
     }
 
@@ -47,7 +105,7 @@ class WorkflowPlan {
 
         b
     }
-    static final List CALLERS = ['nasvar','bcftools','clair3','clairsto','sniffles','severus','stellerator','qdnaseq','delly','subchrom','ichorcna']
+    static final List CALLERS = ['nasvar','bcftools','clair3','clairsto','deepsomatic','sniffles','severus','stellerator','qdnaseq','delly','subchrom','ichorcna']
     static String genome(Object value) {
         def aliases = ['hg38':'hg38', 'grch38':'hg38', 'hs1':'hs1', 'chm13':'hs1', 't2t':'hs1']
         def result = aliases[value?.toString()?.toLowerCase()]
@@ -61,17 +119,28 @@ class WorkflowPlan {
         throw new IllegalArgumentException('--disable-qc must be true or false')
     }
 
+    static boolean adapterTrimming(Map p) {
+        if (p.containsKey('trim')) throw new IllegalArgumentException('--trim has been removed; adapter trimming is on by default. Use --no-trim-adapter to disable it')
+        def disabled = p.containsKey('noTrimAdapter') ? p.noTrimAdapter : (p.containsKey('no-trim-adapter') ? p['no-trim-adapter'] : (p.no_trim_adapter == null ? false : p.no_trim_adapter))
+        if (!(disabled instanceof Boolean) && !(disabled in ['true','false']))
+            throw new IllegalArgumentException('--no-trim-adapter must be true or false')
+        return !disabled.toString().toBoolean()
+    }
+
+    static void validateAdapterTrimming(Map p) {
+        if (adapterTrimming(p) && !p.demux_samplesheet && !p.sequencing_kit?.toString()?.trim())
+            throw new IllegalArgumentException('Default adapter trimming requires --sequencing_kit or --demux_samplesheet; use --no-trim-adapter to disable it')
+    }
+
     static Map resolve(Map p, Map bundle) {
         p = new LinkedHashMap(p)
         p.disable_qc = qcDisabled(p)
-        ['primary','secondary','tertiary','trim','disable_qc'].each { key ->
+        ['primary','secondary','tertiary','no_trim_adapter','disable_qc'].each { key ->
             if (p[key] instanceof String && p[key] in ['true','false']) p[key] = p[key].toBoolean()
         }
-        ['primary','secondary','tertiary','trim','disable_qc'].each { key ->
+        ['primary','secondary','tertiary','no_trim_adapter','disable_qc'].each { key ->
             if (p[key] != null && !(p[key] instanceof Boolean)) throw new IllegalArgumentException("${key} must be boolean")
         }
-        if (p.trim == true && !p.demux_samplesheet && !p.sequencing_kit?.toString()?.trim())
-            throw new IllegalArgumentException('--trim requires --sequencing_kit, or a --demux_samplesheet with a kit for every run')
         if (p.sequencing_kit) identifier(p.sequencing_kit.toString())
         def flags = ['primary','secondary','tertiary'].findAll { p[it] == true }
         if (flags.size() > 1) throw new IllegalArgumentException('Choose only one analysis tier')
@@ -80,7 +149,7 @@ class WorkflowPlan {
         if (build != genome(bundle.genome)) throw new IllegalArgumentException('Reference bundle genome mismatch')
         if (bundle.schema_version != 1 || !bundle.id) throw new IllegalArgumentException('Reference bundle requires schema_version=1 and id')
         def allowed = tier == 'primary' ? [] : tier == 'secondary' ? ['nasvar'] : CALLERS
-        def incompatible = build == 'hs1' ? ['qdnaseq','subchrom','ichorcna'] : []
+        def incompatible = build == 'hs1' ? ['qdnaseq','subchrom','ichorcna','deepsomatic'] : []
         def explicit = p.callers != null
         def requested = explicit ? p.callers.toString().split(',').collect { it.trim() }.unique() : allowed
         if (explicit && !p.callers.toString().trim()) throw new IllegalArgumentException('--callers cannot be empty')
@@ -88,7 +157,7 @@ class WorkflowPlan {
             if (!allowed.contains(it)) throw new IllegalArgumentException("Caller ${it} is not available in ${tier}")
             if (explicit && incompatible.contains(it)) throw new IllegalArgumentException("Caller ${it} does not support ${build}")
         }
-        def skipped = requested.findAll { incompatible.contains(it) }.collect { [caller:it, reason:"unsupported reference ${build}"] }
+        def skipped = requested.findAll { incompatible.contains(it) }.collect { [caller:it, reason:it == 'deepsomatic' ? 'DeepSomatic initial scope is hg38 only' : "unsupported reference ${build}"] }
         if (p.disable_qc == true) skipped += [caller:'qc', reason:'disabled by --disable_qc']
         def selected = requested - incompatible
         // SubChrom consumes germline allele frequencies from Clair3.

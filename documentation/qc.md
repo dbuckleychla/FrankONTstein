@@ -14,8 +14,8 @@ and reference validation remain enabled.
   estimation and execution log. The default thresholds belong to the locked
   modkit version; they are not a fixed workflow-wide probability cutoff.
 - `<sample>/methylation/classy/`: existing classifier outputs.
-- `<sample>/qc/index.html`: self-contained report with SVG plots, no CDN.
-- `<sample>/qc/metrics.json`: versioned metrics, definitions and plot histograms.
+- `<sample>/qc/<sample>.index.html`: self-contained report with SVG plots, no CDN.
+- `<sample>/qc/<sample>.metrics.json`: versioned metrics, definitions and plot histograms.
 - `<sample>/qc/summary.tsv`: scalar summaries.
 - `<sample>/qc/targets.tsv`: original target labels (prefixed by BED line number),
   interval coverage and breadth at both mapping-quality thresholds.
@@ -88,3 +88,8 @@ preprocessing image. No new image key or reference asset is required. The locked
 modkit must support `--cpg --modified-bases 5mC 5hmC --combine-strands --bgzf --log-filepath`. Actual modkit
 and container execution must be verified on a supported Linux host; stub runs
 exercise wiring, not biological calculations.
+
+The prepared-input BAM check now describes the merged **sample**, including for
+multiplexed runs. Its `processing_stage` states whether adapter trimming has
+already occurred. These are bounded prepared-input summaries, not pre-trimming
+run yield; run-level demux counts remain separate.

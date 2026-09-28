@@ -25,11 +25,7 @@ remain unverified. Stub contracts cover all tiers, QC disabled, and resume.
 
 ## Automated checks
 
-Parallel BAM validation checks serial/parallel QC equality across multiple batches,
-reverse-strand records, and propagation of malformed MM errors from workers. A
-local synthetic benchmark (12,000 reads, 8 kb/read, 2,000 modifications/read) took
-2.56 s at 1 CPU, 1.04 s at 4 CPUs, and 0.57 s at 8 CPUs. This measures tag decoding
-on synthetic data, not production storage or full pipeline throughput.
+BAM input checks are now bounded to 1,000 records and do not decode modification tags. Tests cover tag presence, explicitly trusted malformed encoding, sampled-versus-complete yield labels, and preservation of read-group IDs/tags during sample reheadering. VCF tests cover PASS versus dot semantics, all-fail/empty indexed outputs, multisample rejection/selection, and QDNAseq contig normalization. Reference/Classy tests cover explicit exclusions and missing sidecar reporting.
 
 ### Nextflow 26 migration (2026-09-22)
 
@@ -99,3 +95,44 @@ Dorado/model/GPU, Slurm and AWS execution remain unvalidated: the development
 host has no NVIDIA device and its Docker daemon was stopped. Terraform validate
 could not start its provider in the sandbox; the unsandboxed retry was blocked
 by an approval-service error. No infrastructure was applied.
+
+DeepSomatic acceptance additionally requires a real hg38 ONT tumor-only smoke
+run using `ONT_TUMOR_ONLY` and default PoN filtering, validating VCF sample
+identity/indexing, target restriction, PoN evidence, CPU/GPU behavior and failure
+reporting. Stub routing is not inference validation. `test_bcftools_regions.py`
+uses real bcftools and an indexed synthetic BAM to check target boundaries and
+exclude reads in enrichment-only regions.
+
+### Output-review mitigations (2026-09-26)
+
+55 Python tests pass, including exact-PASS versus unassessed FILTER handling,
+empty indexed outputs, sample-header preservation and reference/Classy audits.
+Local finalization of real copied DeepSomatic, QDNAseq, DELLY, Sniffles,
+ClairS-TO and empty Stellerator VCF/BCF outputs matched their existing PASS
+counts and produced usable indexes and expected sample labels. This validates
+postprocessing, not fresh caller inference or biological accuracy.
+Nextflow 26 strict-parser BAM/POD5 tier, multiplexing, QC-disabled and resume
+contracts pass with stubs; GPU-routing and CPU/RAM-cap configuration probes
+pass for AWS, Slurm and local without scheduling jobs. The finalization
+nf-test workflow was exercised directly with Nextflow; nf-test CLI is unavailable.
+Resource changes require a production benchmark. Terraform fmt passes; validate
+cannot load the local AWS provider schema because its plugin fails to start.
+No infrastructure was applied, and vendor dependency checks pass unchanged.
+
+## Task retries
+
+All processes use `errorStrategy = 'retry'` with `--max_retries 2` by default:
+one initial attempt plus up to two retries per task. This includes non-OOM
+failures such as CUDA exit 134. Set `--max_retries 0` to disable retries.
+A task that exhausts retries still fails the workflow. Preflight/configuration
+errors are not process tasks and are not retried. Resource caps still apply;
+retrying does not guarantee placement on another worker or GPU.
+
+Consensus and summary validation: `tests/test_somatic_consensus.py` exercises real
+VCF normalization, PASS agreement, query coordinates and indexed output;
+`tests/test_sample_summary.py` checks identity, availability, escaping and actual
+Quarto rendering when available. `tests/run_consensus_contracts.py` tests caller
+selection, hs1 exclusion, disabled QC and process failures with stubs.
+`tests/consensus.nf.test` checks module sample isolation; the existing tier/resume
+contracts include both new processes. Quarto/container and real reference-dependent
+validation must be reported separately from successful stub tests.

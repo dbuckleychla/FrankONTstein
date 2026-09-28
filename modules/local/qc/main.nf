@@ -56,7 +56,7 @@ process SAMPLE_QC {
     """
     adaptive_qc.py --sample '${meta.id}' --bam '${bam}' --fasta '${fasta}' \
       --bedmethyl '${bed}' --enrichment '${enrichment}' --targets '${targets}' \
-      --threads ${task.cpus} --input-run '${meta.input_run ?: meta.id}' --input-scope ${meta.input_run ? 'run' : 'sample'} --preprocessing preprocessing/*/*
+      --threads ${task.cpus} --input-run '${meta.input_run ?: meta.id}' --input-scope sample --preprocessing preprocessing/*/*
     samtools --version | head -1 > qc.versions.yml
     python3 -c 'import pysam; print("pysam: " + pysam.__version__)' >> qc.versions.yml
     """
@@ -74,12 +74,12 @@ process DEMUX_QC {
     tag "${meta.id}"
     container { params.images.preprocess }
     input:
-    tuple val(meta), path(bams, stageAs:'barcodes/*')
+    tuple val(meta), path(bams, stageAs:'barcodes/??/*')
     output:
     tuple val(meta), path('demux_qc.json'), emit: qc
     script:
     """
-    demux_qc.py --threads ${task.cpus} --run '${meta.id}' barcodes/* > demux_qc.json
+    demux_qc.py --threads ${task.cpus} --run '${meta.id}' barcodes/*/* > demux_qc.json
     """
     stub:
     """

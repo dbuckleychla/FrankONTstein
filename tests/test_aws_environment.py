@@ -25,25 +25,21 @@ def outputs(gpu='gpu-queue'):
 
 class AWSEnvironmentTests(unittest.TestCase):
     def test_resolves_outputs_and_run_paths(self):
-        result = helper.build_environment(outputs(), 'run_1h')
+        result = helper.build_environment(outputs())
         self.assertEqual(result['FRANKONTSTEIN_AWS_GPU_QUEUE'], 'gpu-queue')
-        self.assertEqual(result['FRANKONTSTEIN_OUTDIR'], 's3://test-bucket/project/results/run_1h')
-        self.assertEqual(result['FRANKONTSTEIN_WORK_DIR'], 's3://test-bucket/project/work/run_1h')
+        self.assertEqual(result['FRANKONTSTEIN_RESULTS_PREFIX'], 's3://test-bucket/project/results')
+        self.assertEqual(result['FRANKONTSTEIN_WORK_PREFIX'], 's3://test-bucket/project/work')
         self.assertNotIn('AWS_PROFILE', result)
         self.assertEqual(len(result), 8)
 
     def test_cpu_only_outputs_clear_previous_gpu_queue(self):
-        self.assertEqual(helper.build_environment(outputs(None), 'run1')['FRANKONTSTEIN_AWS_GPU_QUEUE'], '')
+        self.assertEqual(helper.build_environment(outputs(None))['FRANKONTSTEIN_AWS_GPU_QUEUE'], '')
 
     def test_invalid_or_incomplete_outputs(self):
         for data in [[], {}, {'nextflow_params': {'value': {}}},
                      outputs() | {'work_dir': {'value': '/local/work'}}]:
             with self.assertRaises(ValueError):
-                helper.build_environment(data, 'run1')
-        for run_id in ['../run', 'run/path', 'run name', '']:
-            with self.assertRaises(ValueError):
-                helper.build_environment(outputs(), run_id)
-
+                helper.build_environment(data)
     def test_terraform_invocation_is_output_only_and_inherits_environment(self):
         with patch.object(helper.subprocess, 'run') as run:
             run.return_value.stdout = json.dumps(outputs())
@@ -59,16 +55,16 @@ class AWSEnvironmentTests(unittest.TestCase):
                 self.assertEqual(helper.read_outputs(None, export), outputs())
                 run.assert_not_called()
             result = subprocess.run([sys.executable, str(ROOT / 'bin/aws_batch_env.py'),
-                                     '--terraform-outputs', str(export), '--run-id', 'run1'],
+                                     '--terraform-outputs', str(export)],
                                     check=True, text=True, capture_output=True)
-            self.assertEqual(result.stdout, helper.shell_exports(helper.build_environment(outputs(), 'run1')))
+            self.assertEqual(result.stdout, helper.shell_exports(helper.build_environment(outputs())))
 
     def test_exports_roundtrip_without_executing_shell_characters(self):
         with tempfile.TemporaryDirectory() as temp:
             sentinel = Path(temp) / 'must-not-exist'
             data = outputs()
             data['nextflow_params']['value']['aws_queue'] = f"queue ' $(touch {sentinel}) `touch {sentinel}` ; end"
-            expected = helper.build_environment(data, 'run1')
+            expected = helper.build_environment(data)
             script = Path(temp) / 'exports.sh'
             script.write_text(helper.shell_exports(expected))
             result = subprocess.run(['/bin/bash', '-c', '. "$1"; "$2" -c \'import os,json; print(json.dumps({k:v for k,v in os.environ.items() if k.startswith("FRANKONTSTEIN_")}))\'',
@@ -80,7 +76,7 @@ class AWSEnvironmentTests(unittest.TestCase):
 
     def test_output_failure_emits_no_shell_code(self):
         result = subprocess.run([sys.executable, str(ROOT / 'bin/aws_batch_env.py'),
-                                 '--run-id', 'run1', '--terraform-outputs', '/nonexistent/outputs.json'],
+                                 '--terraform-outputs', '/nonexistent/outputs.json'],
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, '')

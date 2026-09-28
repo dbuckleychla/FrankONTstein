@@ -8,7 +8,10 @@ commands to adapt to your data; they are not claims of biological validation.
 
 Copy `assets/references.example.yaml` to `references.hg38.yaml` and edit the paths.
 Keep the downloaded `images.lock.json` in the workflow directory. Supply `bam`,
-`genome`, and `sample_id` on the command line, not in the reusable reference file.
+`genome`, and `sample_id` (singleton) or `experiment_id` (multiplexed direct input)
+on the command line, not in the reusable reference file. Adapter/primer trimming
+is on by default and requires a kit, either `--sequencing_kit` or the demux sheet.
+Examples using `--no-trim-adapter` explicitly skip it without assuming a library kit.
 
 - Relative reference paths in YAML resolve from the directory containing `main.nf`.
 - The `-params-file` path, BAM/sample-manifest paths, output directory and work
@@ -32,7 +35,7 @@ See [reference preparation](../docs/references.md) and
 nextflow run . \
   -profile local,docker \
   -params-file references.hg38.yaml \
-  --bam /data/BC3.bam --genome hg38 --sample_id BC3 \
+  --bam /data/BC3.bam --genome hg38 --no-trim-adapter --sample_id BC3 \
   --primary \
   --outdir results/BC3_primary \
   -work-dir work/BC3_primary
@@ -48,7 +51,7 @@ nextflow run . \
   -profile local,docker \
   -params-file references.hg38.yaml \
   --bam /data/BC3.bam --genome hg38 --sample_id BC3 \
-  --primary --trim --sequencing_kit SQK-LSK114 \
+  --primary --sequencing_kit SQK-LSK114 \
   --outdir results/BC3_primary_trimmed \
   -work-dir work/BC3_primary_trimmed
 ```
@@ -63,7 +66,7 @@ by genome. Its repeats, SNP sites and GFF3 must be configured in the YAML.
 nextflow run . \
   -profile local,docker \
   -params-file references.hg38.yaml \
-  --bam /data/BC3.bam --genome hg38 --sample_id BC3 \
+  --bam /data/BC3.bam --genome hg38 --no-trim-adapter --sample_id BC3 \
   --secondary \
   --outdir results/BC3_secondary \
   -work-dir work/BC3_secondary
@@ -78,7 +81,7 @@ Configure all selected caller assets in the reference YAML. Results stay separat
 nextflow run . \
   -profile local,docker \
   -params-file references.hg38.yaml \
-  --bam /data/BC3.bam --genome hg38 --sample_id BC3 \
+  --bam /data/BC3.bam --genome hg38 --no-trim-adapter --sample_id BC3 \
   --tertiary \
   --outdir results/BC3_tertiary \
   -work-dir work/BC3_tertiary
@@ -102,7 +105,7 @@ Changing `--genome` alone does not replace paths in the reference file.
 nextflow run . \
   -profile local,docker \
   -params-file references.chm13.yaml \
-  --bam /data/BC3.bam --genome CHM13 --sample_id BC3 \
+  --bam /data/BC3.bam --genome CHM13 --no-trim-adapter --sample_id BC3 \
   --tertiary --callers nasvar,sniffles \
   --outdir results/BC3_chm13 \
   -work-dir work/BC3_chm13
@@ -157,14 +160,14 @@ nextflow run . \
   -profile local,docker \
   -params-file references.hg38.yaml \
   --input pooled.csv --demux_samplesheet demux.csv --genome hg38 \
-  --secondary --trim \
+  --secondary \
   --outdir results/demultiplexed \
   -work-dir work/demultiplexed
 ```
 
 The kit comes from the demux sheet. `experiment_id` matches `pooled.csv`’s `run`; `alias` names the output sample. Extra sequencer columns are accepted, and `sample_id` is not used for routing. Demultiplexing precedes trimming; unclassified
-reads are retained separately. Missing barcodes fail explicitly. Omit `--trim`
-if trimming is not wanted.
+reads are retained separately. Missing barcodes fail explicitly. Add `--no-trim-adapter`
+if adapter/primer trimming is not wanted; barcode trimming remains enabled.
 
 ## 8. Resume from another launch directory (EC2 example)
 
@@ -174,7 +177,7 @@ From `/home/ec2-user/work`, with the workflow in `/home/ec2-user/FrankONTstein`:
 nextflow run ../FrankONTstein/main.nf \
   -profile local,docker \
   -params-file ../FrankONTstein/assets/ec2_test_references.yaml \
-  --bam "$PWD/BC3.bam" --genome hg38 --sample_id BC3 \
+  --bam "$PWD/BC3.bam" --genome hg38 --no-trim-adapter --sample_id BC3 \
   --primary \
   --outdir ./results \
   -work-dir ./nxf_work \
@@ -206,8 +209,8 @@ process {
 ```
 
 Add `-c resources.config` to the command. Explicit overrides bypass caps unless
-cap logic is included. Default alignment/threaded callers request 16 CPUs/32 GB;
-Classy requests 8 CPUs/8 GB and NASVAR 8 CPUs/32 GB.
+cap logic is included. Default alignment requests 32 CPUs/64 GB; Clair3/ClairS-TO 16 CPUs/32 GB,
+Classy 8 CPUs/16 GB and NASVAR 2 CPUs/8 GB. Global caps apply.
 
 ## 10. Slurm with Apptainer
 
@@ -218,7 +221,7 @@ queue/account values with your site's settings.
 nextflow run . \
   -profile slurm,apptainer \
   -params-file references.hg38.yaml \
-  --bam /shared/data/BC3.bam --genome hg38 --sample_id BC3 \
+  --bam /shared/data/BC3.bam --genome hg38 --no-trim-adapter --sample_id BC3 \
   --secondary \
   --slurm_queue YOUR_PARTITION --slurm_account YOUR_ACCOUNT \
   --outdir /shared/results/BC3_secondary \
@@ -240,7 +243,7 @@ an arrangement Nextflow can stage from S3.
 nextflow run . \
   -profile aws \
   -params-file references.aws.hg38.yaml \
-  --bam s3://YOUR_INPUT_BUCKET/BC3.bam --genome hg38 --sample_id BC3 \
+  --bam s3://YOUR_INPUT_BUCKET/BC3.bam --genome hg38 --no-trim-adapter --sample_id BC3 \
   --secondary \
   --aws_region YOUR_REGION \
   --aws_queue YOUR_BATCH_QUEUE \
@@ -272,7 +275,7 @@ and Classy while skipping comprehensive QC:
 
 ```bash
 nextflow run ./main.nf -profile local,docker -params-file references.yaml \
-  --bam /data/sample.bam --sample_id sample --genome hg38 \
+  --bam /data/sample.bam --no-trim-adapter --sample_id sample --genome hg38 \
   --primary --disable-qc true --outdir results -resume
 ```
 

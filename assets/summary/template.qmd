@@ -1,0 +1,23 @@
+---
+title: "FrankONTstein sample summary"
+format:
+  html:
+    embed-resources: true
+    theme: none
+    highlight-style: none
+    toc: true
+    toc-depth: 2
+    code-tools: false
+    page-layout: full
+---
+
+<style>
+body { font-family: system-ui,sans-serif; max-width:1200px; margin:2em auto; padding:0 1em; color:#192c3e; line-height:1.5; }
+h1,h2,h3 { color:#164a63; }
+td,th { padding:0.5em; border-bottom:1px solid #d9e2ea; text-align:left; }
+table { display:block; overflow-x:auto; font-size:0.9rem; }
+th { background:#eef2f6; }
+.notice { padding:1em; border-left:4px solid #b57b00; background:#fff7e5; }
+</style>
+
+<!-- SUMMARY_CONTENT -->

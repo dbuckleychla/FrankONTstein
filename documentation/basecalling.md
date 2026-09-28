@@ -13,7 +13,7 @@ select only direct-child `*.pod5` files, not nested directories. Multiple rows
 for the same sample combine its chunks. In multiplexed mode rows group by run;
 `--demux_samplesheet` accepts the sequencer export with required columns
 `experiment_id,kit,barcode,alias`. `experiment_id` matches the input run ID;
-`alias` names the output sample. A direct invocation’s `--sample_id` must match
+`alias` names the output sample. A direct multiplexed invocation’s `--experiment_id` must match
 `experiment_id`. Extra columns (including the sheet’s `sample_id`) are optional
 and ignored for routing. One kit
 per run and unique sample/barcode mappings remain mandatory.
@@ -53,10 +53,10 @@ set `steps.clair3.model` to a local or S3 directory named
 `r1041_e82_400bps_sup_v520_with_mv` (or the corresponding HAC directory), containing
 `pileup.pt` and `full_alignment.pt`. The workflow stages these weights, validates
 accuracy/version pairing with `--basecall_model`, records their checksums, and
-passes `--enable_move_table` to Clair3. Relative model paths resolve from projectDir.
+passes `--enable_dwell_time` to Clair3. Relative model paths resolve from projectDir.
 Move-aware models require valid `mv` tags; existing preprocessing scans reject
 missing/stale move tables. The pinned Clair3 runtime must expose
-`--enable_move_table`; actual model/runtime compatibility still needs a smoke run.
+`--enable_dwell_time`; actual model/runtime compatibility still needs a smoke run.
 
 ## GPU execution
 
@@ -82,9 +82,17 @@ independent.
 ## Data flow and outputs
 
 Dorado emits unaligned, untrimmed BAM shards with modification tags and read
-groups. Shards merge on CPU through `PREPARE_BAM`, then enter existing
-sample demultiplexing, optional trimming, alignment, QC and analysis. Unclassified
-BAMs retain the existing demultiplex output behavior. Disabling QC does not skip
+groups. Multiplexed runs demultiplex each shard on CPU as soon as it is ready,
+with barcode trimming enabled (no `--no-trim`). Each barcode BAM then runs
+adapter/primer trimming independently as soon as it is ready. Trimmed outputs
+merge by mapped sample through `PREPARE_BAM`, which runs the bounded BAM check,
+followed by alignment, QC and analysis. A requested barcode may be absent in some shards but must occur in the
+run. Multiple BAM inputs use the same parallel path; an already merged BAM is
+one demux task. Singleton inputs trim each shard/input BAM before merging through `PREPARE_BAM`.
+
+Raw barcode/unclassified BAMs publish under `demultiplex/<experiment>/<shard>/`
+(`batch_00000001` for POD5 or `input_00000001` for sorted BAM inputs), avoiding
+cross-shard overwrites. Run-level demux QC sums yield across all shards. Disabling QC does not skip
 modification-tag checks, Classy or indexed CpG bedMethyl.
 
 Shards remain in Nextflow work storage. `basecalling/<input-group>/batch_*.log`
@@ -106,7 +114,7 @@ Keep the existing BAM commands for pre-basecalled input. For singleton POD5:
 
 ```bash
 nextflow run . -profile local,docker -params-file references-and-models.yaml \
-  --basecall --pod5 /data/run/pod5 --sample_id sample1 --genome hg38 \
+  --basecall --pod5 /data/run/pod5 --no-trim-adapter --sample_id sample1 --genome hg38 \
   --basecall_device 0 --targets_bed targets.bed --enrichment_bed enrichment.bed \
   --image_manifest images.lock.json --outdir results/sample1
 ```
@@ -115,7 +123,7 @@ For multiplexed POD5 on Slurm:
 
 ```bash
 nextflow run . -profile slurm,apptainer -params-file references-and-models.yaml \
-  --basecall --pod5 /data/run/pod5 --sample_id run1 --genome hg38 \
+  --basecall --pod5 /data/run/pod5 --experiment_id run1 --genome hg38 \
   --demux_samplesheet demux.csv --gpu_queue GPU_PARTITION --slurm_queue CPU_PARTITION \
   --targets_bed targets.bed --enrichment_bed enrichment.bed \
   --image_manifest images.lock.json --outdir results/run1
@@ -151,3 +159,52 @@ GPU utilization, peak host RSS, throughput and cost on the same input before
 reducing further; increase CPUs if input/output processing starves the GPU.
 `--basecall_max_forks` controls concurrency independently. Resource-only edits
 normally preserve task cache keys; the Dorado command is unchanged by this tuning.
+
+Clair3 defaults to `--clair3_gpu auto`: it uses `--aws_gpu_queue` for the AWS
+profile, `--gpu_queue` for Slurm/Apptainer, or `--basecall_device` for local
+Docker. No configured GPU means CPU execution. `--clair3_gpu false` overrides
+auto-selection; `true` requires the matching queue/device. This applies to
+Clair3 selected directly or through SubChrom, including BAM-only runs.
+ClairS-TO supports the same queue/device routing through the independent
+`--clairsto_gpu` setting, which currently defaults to `false` (CPU) because the pinned image has a GPU indel bug. It defaults to one prediction
+worker per GPU task (`--clairsto_gpu_threads 1`) and verifies PyTorch CUDA
+availability at startup. AWS/Slurm reserve one GPU per caller task; local
+Docker device selection does not itself schedule exclusive access across
+multiple processes or separate workflow runs.
+
+### Direct-input identity
+
+For a multiplexed BAM or POD5 input, specify `--experiment_id` together with
+`--demux_samplesheet`. It must match the sheet's `experiment_id`; `alias` supplies
+individual output sample names. The previous use of `--sample_id` for a pooled
+run now fails with a migration message. Singleton inputs still require
+`--sample_id`. Manifests retain their `sample` and `run` columns and cannot be
+combined with either direct-input identity option. `--run_id` remains the
+independent work/results directory label.
+
+
+Changing to shard-level demultiplexing invalidates demux/preparation and downstream
+work. Dorado basecalling commands are unchanged and remain eligible for resume
+with the original cache/work directory. Use a fresh output destination to avoid
+mixing old run-level demux outputs with the new shard directories.
+
+Demultiplexing always trims barcodes. Dorado adapter/primer trimming runs independently
+on each shard or barcode BAM before sample merging by default; `--no-trim-adapter` skips only that separate step.
+The old `--trim` option is rejected with a migration message. Singleton inputs
+require `--sequencing_kit` unless adapter trimming is disabled.
+Basecalling retains `--no-trim` so barcode classification sees the original ends.
+
+Trimming does not repeat BAM validation for every shard. PREPARE_BAM checks the
+merged sample once. With `--no-trim-adapter`, the same inputs merge without the
+TRIM_BAM stage. An already merged input BAM supplies one trimming task (or one
+per emitted barcode BAM when demultiplexing).
+
+PREPARE_BAM uses `samtools cat` for multiple compatible unaligned BAMs, preserving
+compressed blocks instead of decoding/recompressing records. One input uses a
+symlink. A header-only pass unions read-group/program entries and records source
+headers in `<sample>.cat_header.json`. Conflicting RG/PG identities or sequence
+dictionaries are rejected; differing command lines for the same program are
+retained in provenance, with the ambiguous CL field omitted from the combined
+header. The bounded BAM check still runs after concatenation. S3 staging and
+uploads remain necessary. This command change invalidates preparation and its
+downstream tasks; upstream basecall/demux/trim remain cache-eligible.

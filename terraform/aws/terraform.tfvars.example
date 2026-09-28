@@ -2,7 +2,7 @@ region = "us-west-2"
 name   = "frankontstein-dev"
 # Standard AWS credentials / AWS_PROFILE are honored; no account is embedded.
 # General CPU queue: allowed instance families and total compute capacity.
-instance_types = ["m6i", "r6i"]
+instance_types = ["m8i", "r8i"]
 max_vcpus      = 256
 spot           = false
 # Optional existing network, with outbound connectivity for images and assets:
@@ -21,6 +21,13 @@ s3_prefix = "FrankONTstein/"
 # gpu_max_vcpus      = 32
 
 # Optional: reuse a self-contained AWS CLI installation already in BOTH EC2 AMIs.
-# No CLI download/package installation occurs in this mode.
+# Skips AWS CLI installation; host diagnostics still install CloudWatch agent.
 # use_existing_aws_cli  = true
 # existing_aws_cli_path = "/usr/local/aws-cli/v2/current/bin/aws"
+
+# Shared Docker/task gp3 storage. Above-baseline performance has additional cost.
+scratch_gb               = 500
+scratch_iops             = 6000
+scratch_throughput_mibps = 500
+# New CPU and GPU workers forward journal/ECS/bootstrap logs automatically.
+# See terraform output host_diagnostics for the CloudWatch location.

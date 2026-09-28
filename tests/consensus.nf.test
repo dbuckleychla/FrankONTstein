@@ -1,0 +1,8 @@
+nextflow_pipeline {
+    name "Consensus and summary sample isolation (stubs only)"
+    script "consensus_workflow.nf"
+    options "-stub-run"
+    test("independent per-sample consensus and HTML products") {
+        then { assert workflow.success }
+    }
+}

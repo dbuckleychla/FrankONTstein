@@ -9,7 +9,7 @@ class RunStatus {
             runState.error = taskFault?.error?.message ?: runState.error
             def summaryTrace = 'name\tstatus\n' + runState.completed.collect { item -> "PUBLISH_ARTIFACT (${item.sample}:${item.analysis})\tCOMPLETED\n" }.join('')
             if (runState.failureTask) summaryTrace += "${runState.failureTask}\tFAILED\n"
-            def analyses = RunStatus.summarize(runState.samples, (runState.provenance.plan?.callers ?: []) + ['bedmethyl','qc'] + (runState.provenance.basecalling?.enabled ? ['basecalling'] : []), summaryTrace, runState.inputGroups ?: [:])
+            def analyses = RunStatus.summarize(runState.samples, (runState.provenance.plan?.callers ?: []) + ['bedmethyl','qc','summary'] + (runState.provenance.plan?.callers?.containsAll(['deepsomatic','clairsto']) ? ['consensus'] : []) + (runState.provenance.basecalling?.enabled ? ['basecalling'] : []), summaryTrace, runState.inputGroups ?: [:])
             if (runState.failureTask?.contains('CHECK_BASECALL_MODELS')) analyses.findAll { it.analysis == 'basecalling' }.each { it.status = 'failed' }
             analyses.each { row ->
                 row.files = runState.completed.findAll { it.sample == row.sample && it.analysis == row.analysis }.collectMany { it.files ?: [] }.unique()
@@ -28,8 +28,8 @@ class RunStatus {
     }
 
     static List summarize(List samples, List callers, String trace, Map inputGroups = [:]) {
-        def aliases = [DORADO_BASECALL:'basecalling', MODKIT_PILEUP:'bedmethyl', INDEX_BEDMETHYL:'bedmethyl', SAMPLE_QC:'qc', ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
-            CLAIRS_TO_CALL:'clairsto', BCFTOOLS_MPILEUP:'bcftools', BCFTOOLS_CALL:'bcftools',
+        def aliases = [DEMULTIPLEX:'alignment', PREPARE_BAM:'alignment', TRIM_BAM:'alignment', DORADO_BASECALL:'basecalling', MODKIT_PILEUP:'bedmethyl', INDEX_BEDMETHYL:'bedmethyl', SAMPLE_QC:'qc', ALIGN:'alignment', CLASSY_COMBINED:'methylation', NASVAR:'nasvar', CLAIR3:'clair3',
+            SOMATIC_CONSENSUS:'consensus', SAMPLE_SUMMARY:'summary', DEEPSOMATIC:'deepsomatic', CLAIRS_TO_CALL:'clairsto', BCFTOOLS_MPILEUP:'bcftools', BCFTOOLS_CALL:'bcftools',
             SNIFFLES_CALL:'sniffles', SEVERUS_TUMOR_UNPHASED:'severus', STELLERATOR:'stellerator',
             QDNASEQ_CALL:'qdnaseq', DELLY:'delly', SUBCHROM:'subchrom', ICHORCNA:'ichorcna']
         def outcomes = [:]
@@ -44,9 +44,9 @@ class RunStatus {
                 if (match.find()) {
                     def process = match.group(1)
                     def sample = match.group(2)
-                    def analysis = process == 'PUBLISH_ARTIFACT' ? match.group(3) : process == 'FILTER_VARIANTS' ? match.group(3)?.tokenize(':')?.getAt(0) : aliases[process]
+                    def analysis = process == 'PUBLISH_ARTIFACT' ? match.group(3) : process in ['FILTER_VARIANTS','FINALIZE_VARIANTS'] ? match.group(3)?.tokenize(':')?.getAt(0) : aliases[process]
                     if (analysis) {
-                        def targets = process == 'DORADO_BASECALL' ? (inputGroups[sample] ?: [sample]) : [sample]
+                        def targets = process in ['DORADO_BASECALL','DEMULTIPLEX'] ? (inputGroups[sample] ?: [sample]) : [sample]
                         targets.each { target ->
                             def key = [target,analysis]
                             if (status == 'FAILED') outcomes[key] = 'failed'

@@ -1,11 +1,13 @@
 resource "aws_launch_template" "batch" {
   name_prefix = "${var.name}-"
-  user_data   = base64encode(templatefile("${path.module}/templates/user_data.mime", { aws_cli_version = var.aws_cli_version, use_existing_aws_cli = var.use_existing_aws_cli, existing_aws_cli_path = var.existing_aws_cli_path }))
+  user_data   = base64encode(templatefile("${path.module}/templates/user_data.mime", { aws_cli_version = var.aws_cli_version, use_existing_aws_cli = var.use_existing_aws_cli, existing_aws_cli_path = var.existing_aws_cli_path, host_agent_config = local.host_agent_config }))
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
       volume_size           = var.scratch_gb
       volume_type           = "gp3"
+      iops                  = var.scratch_iops
+      throughput            = var.scratch_throughput_mibps
       encrypted             = true
       delete_on_termination = true
     }
@@ -35,7 +37,7 @@ resource "aws_batch_compute_environment" "this" {
       version            = tostring(aws_launch_template.batch.latest_version)
     }
   }
-  depends_on = [aws_iam_role_policy_attachment.batch, aws_iam_role_policy_attachment.instance, aws_iam_role_policy_attachment.spot]
+  depends_on = [aws_iam_role_policy.host_diagnostics, aws_iam_role_policy_attachment.batch, aws_iam_role_policy_attachment.instance, aws_iam_role_policy_attachment.spot]
   lifecycle { create_before_destroy = true }
 }
 resource "aws_batch_job_queue" "this" {
@@ -71,7 +73,7 @@ resource "aws_batch_compute_environment" "gpu" {
       version            = tostring(aws_launch_template.batch.latest_version)
     }
   }
-  depends_on = [aws_iam_role_policy_attachment.batch, aws_iam_role_policy_attachment.instance]
+  depends_on = [aws_iam_role_policy.host_diagnostics, aws_iam_role_policy_attachment.batch, aws_iam_role_policy_attachment.instance]
   lifecycle { create_before_destroy = true }
 }
 resource "aws_batch_job_queue" "gpu" {

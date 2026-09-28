@@ -1,3 +1,4 @@
+include { SAMPLE_SUMMARY } from '../modules/local/summary/main'
 include { CHECK_BASECALL_MODELS; DORADO_BASECALL } from '../modules/local/basecall/main'
 include { MODKIT_PILEUP; INDEX_BEDMETHYL; SAMPLE_QC; DEMUX_QC } from '../modules/local/qc/main'
 include { PREPARE_BAM; DEMULTIPLEX; TRIM_BAM; ALIGN } from '../modules/local/preprocess/main'
@@ -19,6 +20,11 @@ workflow PRIMARY {
     basecallVersions = Channel.empty()
     basecallRecords = Channel.empty()
     bamInputs = samples
+    demuxInputs = samples.flatMap { meta, paths ->
+        paths.sort { a,b -> a.toString() <=> b.toString() }.withIndex().collect { bam, index ->
+            tuple(meta, String.format('input_%08d', index + 1), bam)
+        }
+    }
     if (assets.basecalling.enabled) {
         CHECK_BASECALL_MODELS(assets.basecall_models.model, assets.basecall_models.modified[0], plan.callers.contains('clair3'), assets.clair3_model)
         batches = samples.flatMap { meta, paths ->
@@ -27,6 +33,7 @@ workflow PRIMARY {
             }
         }
         DORADO_BASECALL(batches, assets.basecall_models.model, assets.basecall_models.modified[0], CHECK_BASECALL_MODELS.out.provenance)
+        demuxInputs = DORADO_BASECALL.out.bam
         bamInputs = DORADO_BASECALL.out.bam.groupTuple(by:0).map { meta, ids, bams ->
             def ordered = (0..<ids.size()).toList().sort { a,b -> ids[a] <=> ids[b] }.collect { bams[it] }
             tuple(meta, ordered)
@@ -42,33 +49,52 @@ workflow PRIMARY {
         }
         basecallVersions = DORADO_BASECALL.out.versions
     }
-    PREPARE_BAM(bamInputs)
-    versions = PREPARE_BAM.out.versions.mix(basecallVersions)
+    trimInputs = demuxInputs
+    demuxVersions = Channel.empty()
+    demuxQc = Channel.empty()
     if (params.demux_samplesheet) {
-        DEMULTIPLEX(PREPARE_BAM.out.bam)
-        versions = versions.mix(DEMULTIPLEX.out.versions)
-        reads = DEMULTIPLEX.out.bams.flatMap { meta, outputs ->
-            def files = outputs instanceof List ? outputs : [outputs]
-            meta.mappings.collect { mapping ->
-                def matched = files.findAll { it.name.tokenize('_-.').contains(mapping.barcode) }
-                if (matched.size() != 1) error "${meta.id}/${mapping.barcode}: expected one demultiplexed BAM, got ${matched.size()}"
-                tuple([id:mapping.sample, kit:meta.kit, input_run:meta.id, require_moves:meta.require_moves ?: false], matched[0])
+        // Dorado shards flow straight into independent CPU demux tasks. For BAM
+        // input, each supplied file is one task, including an already merged BAM.
+        DEMULTIPLEX(demuxInputs)
+        demuxVersions = DEMULTIPLEX.out.versions
+        trimInputs = DEMULTIPLEX.out.bams.flatMap { meta, shardId, outputs ->
+            def files = (outputs instanceof List ? outputs : [outputs]).sort { a,b -> a.toString() <=> b.toString() }
+            Demultiplexing.sampleBams(meta, files, false).collectMany { sampleMeta, bams ->
+                bams.withIndex().collect { bam, index -> tuple(sampleMeta, "${shardId}_${index}", bam) }
             }
         }
-    } else {
-        reads = PREPARE_BAM.out.bam
+        demuxByRun = DEMULTIPLEX.out.bams.groupTuple(by:0).map { meta, ids, outputs ->
+            def files = (0..<ids.size()).toList().sort { a,b -> ids[a] <=> ids[b] }.collectMany { index ->
+                def batchFiles = outputs[index] instanceof List ? outputs[index] : [outputs[index]]
+                batchFiles.sort { a,b -> a.toString() <=> b.toString() }
+            }
+            tuple(meta, files)
+        }
+        bamInputs = demuxByRun.flatMap { meta, files -> Demultiplexing.sampleBams(meta, files) }
+        if (!WorkflowPlan.qcDisabled(params as Map)) {
+            DEMUX_QC(demuxByRun)
+            demuxQc = DEMUX_QC.out.qc
+        }
     }
-    inputQc = PREPARE_BAM.out.qc.map { m,q -> tuple(m.id,[q]) }
+    trimVersions = Channel.empty()
+    if (WorkflowPlan.adapterTrimming(params as Map)) {
+        // Trim immediately per available shard; merge only when all sample parts
+        // and the run-level requested-barcode validation are complete.
+        TRIM_BAM(trimInputs)
+        trimmedBySample = TRIM_BAM.out.bam.groupTuple(by:0).map { meta, ids, bams ->
+            def ordered = (0..<ids.size()).toList().sort { a,b -> ids[a] <=> ids[b] }.collect { bams[it] }
+            tuple(meta, ordered)
+        }
+        bamInputs = trimmedBySample.join(bamInputs.map { meta, bams -> tuple(meta,true) }).map { meta, bams, validated -> tuple(meta,bams) }
+        trimVersions = TRIM_BAM.out.versions
+    }
+    PREPARE_BAM(bamInputs)
+    versions = PREPARE_BAM.out.versions.mix(basecallVersions, demuxVersions, trimVersions)
+    reads = PREPARE_BAM.out.bam
+    sampleQc = PREPARE_BAM.out.qc.map { m,q -> tuple(m.id,[q]) }
     if (params.demux_samplesheet && !WorkflowPlan.qcDisabled(params as Map)) {
-        DEMUX_QC(DEMULTIPLEX.out.bams)
-        inputQc = inputQc.join(DEMUX_QC.out.qc.map { m,q -> tuple(m.id,q) }).map { id,files,q -> tuple(id,files + [q]) }
-    }
-    sampleQc = reads.map { m,b -> tuple(m.input_run ?: m.id,m) }.combine(inputQc, by:0).map { id,m,q -> tuple(m.id,q) }
-    if (params.trim.toString().toBoolean()) {
-        TRIM_BAM(reads)
-        versions = versions.mix(TRIM_BAM.out.versions)
-        reads = TRIM_BAM.out.bam
-        sampleQc = sampleQc.join(TRIM_BAM.out.qc.map { m,q -> tuple(m.id,q) }).map { id,files,q -> tuple(id,files + [q]) }
+        runQcBySample = demuxQc.flatMap { m,q -> m.mappings.collect { mapping -> tuple(mapping.sample,q) } }
+        sampleQc = sampleQc.join(runQcBySample).map { id,files,q -> tuple(id,files + [q]) }
     }
     ALIGN(reads, VALIDATE_REFERENCE.out.reference)
     aligned = ALIGN.out.bam.map { m,b,i ->
@@ -147,15 +173,22 @@ workflow REPORTING {
     qcMetrics
     basecallRecords
     main:
-    PUBLISH_ARTIFACT(artifacts)
+    summaryInputs = artifacts.map { m,a,f -> tuple(m, [analysis:a, files:SummaryInputs.select(m,a,f)]) }
+        .groupTuple()
+        .map { m, rows -> tuple(m, rows.collect { it.analysis }.unique().sort(), rows.collectMany { it.files }.unique().sort { it.toString() }) }
+    summaryContext = [plan:plan, run_id:provenance.parameters.run_id, session_id:provenance.session_id,
+                      disable_qc:provenance.parameters.disable_qc, images:provenance.images]
+    SAMPLE_SUMMARY(summaryInputs, summaryContext, file("${projectDir}/assets/summary/template.qmd"))
+    summaryArtifacts = SAMPLE_SUMMARY.out.results.map { m,h,j -> tuple(m,'summary',[h,j]) }
+    PUBLISH_ARTIFACT(artifacts.mix(summaryArtifacts))
     records = PUBLISH_ARTIFACT.out.results.map { m,a,files ->
         def paths = files instanceof List ? files : [files]
-        def record = [sample:m.id, analysis:a, status:'completed', files:paths.collect { "${m.id}/${a == 'bedmethyl' ? 'methylation' : a}/${it.name}" }]
+        def record = [sample:m.id, analysis:a, status:'completed', files:paths.collect { "${m.id}/${OutputLayout.directory(a)}/${it.name}" }]
         statusState.completed.add(record)
         record
     }.mix(aligned.map { m,b,i -> [sample:m.id, analysis:'alignment', status:'completed', files:["${m.id}/alignment/${b.name}", "${m.id}/alignment/${i.name}"]] })
     records = records.mix(basecallRecords)
-    SOFTWARE_VERSIONS(versions.collect().map { it.sort { a,b -> a.toString() <=> b.toString() } })
+    SOFTWARE_VERSIONS(versions.mix(SAMPLE_SUMMARY.out.versions).collect().map { it.sort { a,b -> a.toString() <=> b.toString() } })
     completeRecords = records.collect().map { rows ->
         def grouped = rows.groupBy { [it.sample, it.analysis] }.collect { key, items ->
             [sample:key[0], analysis:key[1], status:'completed', files:items.collectMany { it.files }.unique().sort()]

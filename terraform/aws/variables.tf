@@ -124,3 +124,22 @@ variable "existing_aws_cli_path" {
     error_message = "Use an absolute AWS CLI executable path ending in /aws, without spaces or shell metacharacters."
   }
 }
+
+variable "scratch_iops" {
+  type        = number
+  default     = 6000
+  description = "Provisioned gp3 root-disk IOPS shared by Docker and task scratch; incurs EBS charges above baseline."
+  validation {
+    condition     = var.scratch_iops >= 3000 && var.scratch_iops <= 16000 && floor(var.scratch_iops) == var.scratch_iops
+    error_message = "scratch_iops must be an integer from 3000 to 16000."
+  }
+}
+variable "scratch_throughput_mibps" {
+  type        = number
+  default     = 500
+  description = "gp3 throughput in MiB/s shared by image extraction and task I/O; limited by the EC2 instance EBS bandwidth."
+  validation {
+    condition     = var.scratch_throughput_mibps >= 125 && var.scratch_throughput_mibps <= 1000 && var.scratch_throughput_mibps <= var.scratch_iops / 4 && floor(var.scratch_throughput_mibps) == var.scratch_throughput_mibps
+    error_message = "Use integer throughput 125–1000 MiB/s, at most one quarter of provisioned IOPS."
+  }
+}

@@ -17,11 +17,29 @@ class Basecalling {
         value.toString().toInteger()
     }
 
+    static String directIdentity(Map p) {
+        if (p.input) {
+            if (p.experiment_id || p.sample_id)
+                throw new IllegalArgumentException('--input supplies sample/run identities; do not combine it with --experiment_id or --sample_id')
+            return null
+        }
+        if (p.demux_samplesheet) {
+            if (p.sample_id) throw new IllegalArgumentException('Multiplexed direct input requires --experiment_id instead of --sample_id')
+            if (!p.experiment_id) throw new IllegalArgumentException('Multiplexed direct input requires --experiment_id matching the demux sheet experiment_id')
+            WorkflowPlan.identifier(p.experiment_id as String)
+            return p.experiment_id as String
+        }
+        if (p.experiment_id) throw new IllegalArgumentException('--experiment_id requires --demux_samplesheet; singleton input uses --sample_id')
+        if (!p.sample_id) throw new IllegalArgumentException('Singleton direct input requires --sample_id')
+        WorkflowPlan.identifier(p.sample_id as String)
+        return p.sample_id as String
+    }
+
     static Map validate(Map p, String executor, String profiles) {
         boolean active = enabled(p)
         if ([p.bam, p.pod5, p.input].count { it } != 1)
             throw new IllegalArgumentException('Choose exactly one of --bam, --pod5 or --input')
-        if (!p.input) WorkflowPlan.identifier(p.sample_id as String)
+        directIdentity(p)
         if (!active) {
             if (p.pod5) throw new IllegalArgumentException('POD5 input requires --basecall')
             return [enabled:false]

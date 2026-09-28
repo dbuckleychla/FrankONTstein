@@ -11,5 +11,6 @@
   "qdnaseq": "ghcr.io/chusj-pigu/qdnaseq@sha256:870d6228e7a6fdfb08c3093069be07adb9f26084bcc12cf11a2c24eeb99bd1d9",
   "delly": "ghcr.io/chusj-pigu/delly@sha256:7009e0aebca9dd703fc0958738cb1fa3d547b7cc05086f7feab6436aa015e831",
   "subchrom": "ghcr.io/chusj-pigu/subchrom@sha256:ab95d47f012678bf89f9161a548b88fd542907ad52b2524e1bd2198e112c7224",
-  "ichorcna": "ghcr.io/chusj-pigu/ichorcna@sha256:d70be8a59c4eda1d4f7d9adf856ed603419b5d5ea65f8d573c9252165d5db95a"
+  "ichorcna": "ghcr.io/chusj-pigu/ichorcna@sha256:d70be8a59c4eda1d4f7d9adf856ed603419b5d5ea65f8d573c9252165d5db95a",
+  "deepsomatic": "google/deepsomatic@sha256:7f201540f3b267099c3f3cdcd4164798b58cca36ee89fd55fc56991cd82f1c31"
 }

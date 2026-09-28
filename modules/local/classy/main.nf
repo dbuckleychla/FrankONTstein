@@ -16,7 +16,7 @@ process CLASSY_COMBINED {
     mkdir classy
     classy combined -i '${bam}' -o 'classy/${meta.id}_combined_classification.json' \
       --sample '${meta.id}' --reference '${fasta}' --use-pileup --motif CpG:CG \
-      --genome '${build}' --pileup-threads ${task.cpus}
+      --genome '${build}' --pileup-threads ${task.cpus} 2>&1 | tee classy/runtime.log
     test -s 'classy/${meta.id}_combined_classification.json'
     classy --version > versions.yml 2>&1
     modkit --version >> versions.yml

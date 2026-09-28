@@ -1,17 +1,21 @@
 process PUBLISH_ARTIFACT {
     tag "${meta.id}:${analysis}"
     container { params.images.preprocess }
-    publishDir { "${params.outdir}/${meta.id}/${analysis == 'bedmethyl' ? 'methylation' : analysis}" }, mode: 'copy', pattern: 'artifacts/*', saveAs: { name -> name.replaceFirst('artifacts/', '') }
+    publishDir { "${params.outdir}/${meta.id}/${OutputLayout.directory(analysis)}" }, mode: 'copy', pattern: 'artifacts/*', saveAs: { name -> name.replaceFirst('artifacts/', '') }
     input:
     tuple val(meta), val(analysis), path(files, stageAs:'source/*')
     output:
     tuple val(meta), val(analysis), path('artifacts/*'), emit: results
     script:
     // These callers emit a wrapper directory; publish its contents under the analysis.
-    def source = analysis in ['nasvar', 'ichorcna', 'subchrom', 'qc'] ? 'source/*/.' : 'source/*'
+    def paths = files instanceof List ? files : [files]
+    def isLog = paths.every { it.name in ['SUBCHROM','ICHORCNA','HMMCOPY_WIG'] }
+    def source = analysis in ['nasvar', 'ichorcna', 'subchrom', 'qc'] && !isLog ? 'source/*/.' : 'source/*'
     """
     mkdir artifacts
     cp -RL ${source} artifacts/
+    ${analysis == 'methylation' ? "audit_classy.py 'artifacts/classy/${meta.id}_combined_classification.json'" : ''}
+    name_sample_artifacts.py artifacts '${meta.id}'
     """
 }
 process RESULTS_INDEX {
