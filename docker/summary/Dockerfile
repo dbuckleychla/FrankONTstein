@@ -8,6 +8,8 @@ RUN curl -fsSL "https://github.com/quarto-dev/quarto-cli/releases/download/v${QU
     && ln -s /opt/quarto/bin/quarto /usr/local/bin/quarto \
     && rm /tmp/quarto.tar.gz \
     && test "$(quarto --version)" = "${QUARTO_VERSION}"
+# Quarto invokes external `which` when probing optional runtimes, even for plain Markdown.
+RUN dnf install -y which && dnf clean all && which quarto
 # Build-time offline HTML smoke test; no R/Jupyter dependencies.
 RUN printf '%s\n' '---' 'format:' '  html:' '    embed-resources: true' '---' '# Smoke test' > /tmp/smoke.qmd \
     && quarto render /tmp/smoke.qmd --to html \
