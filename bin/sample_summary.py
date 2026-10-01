@@ -105,7 +105,16 @@ def render(data,template):
     warnings=list(qc.get('warnings',[]))+(data['quality_warnings'] or {}).get('warnings',[])+(data['quality_warnings'] or {}).get('limitations',[])
     sections.append(table(['Review warnings'],[[w] for w in warnings]))
     sections.append('## Somatic consensus\n\n<div class="notice">Tumor-only somatic candidates: exact normalized allele and PASS agreement between DeepSomatic and ClairS-TO. Agreement does not prove somatic origin. No consensus detected is not a confident reference call.</div>')
-    sections.append(table(['Status','SNVs','Indels','Reason'],[[c['status'],(c.get('counts') or {}).get('snv'),(c.get('counts') or {}).get('indel'),c.get('reason')]]))
+    reason = c.get('reason')
+    if not reason and c['status'] == 'completed':
+        if any((c.get('counts') or {}).values()):
+            reason = 'PASS agreement at configured NASVAR queries.'
+        elif not c.get('evidence'):
+            reason = 'No eligible variant records at the configured NASVAR query positions/windows.'
+        else:
+            reason = 'No allele passed both somatic callers at the configured NASVAR queries.'
+    sections.append('<p>Counts cover only NASVAR pathogenic SNV query positions and indel windows, not all target regions. Pharmacogenomic findings are separate.</p>')
+    sections.append(table(['Status','SNVs','Indels','Reason'],[[c['status'],(c.get('counts') or {}).get('snv'),(c.get('counts') or {}).get('indel'),reason]]))
     evidence=c.get('evidence',[]);nasgenes=(data['nasvar'] or {}).get('snv',{}).get('genes',{});itdgenes=(data['nasvar'] or {}).get('itd',{}).get('genes',{})
     qrows=[]
     for q in c.get('queries',[]):

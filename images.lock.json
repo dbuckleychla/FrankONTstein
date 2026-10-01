@@ -1,6 +1,6 @@
 {
-  "preprocess": "ghcr.io/dbuckleychla/frankontstein@sha256:10f28b527e3c1b4537b33219a0acd30c7a47e9fbb10da3f9ff640c1b5616bb9d",
-  "nasvar": "ghcr.io/dbuckleychla/frankontstein@sha256:bab84979a3777ff7b38cad540374913951c5c0f3f998dfd28b5999270eee282e",
+  "preprocess": "ghcr.io/dbuckleychla/frankontstein@sha256:7a22815320284c4fb12fc854b73cade89e1be3a8398f56dd14b675f0c46d0ec4",
+  "nasvar": "ghcr.io/dbuckleychla/frankontstein@sha256:fac24c2adc940c8273699baf0a8fcd3375cd0f2058ecbc473577dcfad44a73b2",
   "classy": "ghcr.io/chusj-pigu/classy-slim@sha256:7ec5fc1e4607be13d30dc65a1b07f2844f8289edbec0ca67a70e9b88ef8beb4c",
   "bcftools": "ghcr.io/chusj-pigu/bcftools@sha256:fe6207fca0e32886ea4161b7b55d0927947658f911b2dccc7e2b590ca7483b48",
   "clair3": "ghcr.io/chusj-pigu/clair3@sha256:e02a63cb7eef4c69291f13adab59f5203a3cf68511572db66f962d381084efed",
@@ -12,5 +12,6 @@
   "delly": "ghcr.io/chusj-pigu/delly@sha256:7009e0aebca9dd703fc0958738cb1fa3d547b7cc05086f7feab6436aa015e831",
   "subchrom": "ghcr.io/chusj-pigu/subchrom@sha256:ab95d47f012678bf89f9161a548b88fd542907ad52b2524e1bd2198e112c7224",
   "ichorcna": "ghcr.io/chusj-pigu/ichorcna@sha256:d70be8a59c4eda1d4f7d9adf856ed603419b5d5ea65f8d573c9252165d5db95a",
+  "summary": "ghcr.io/dbuckleychla/frankontstein@sha256:939369c21fe88e5c2f46ebdfbe1c2c88fcef33e5d2ac8e26048c5a13076eafd1",
   "deepsomatic": "google/deepsomatic@sha256:7f201540f3b267099c3f3cdcd4164798b58cca36ee89fd55fc56991cd82f1c31"
 }
