@@ -6,6 +6,18 @@ on:
 permissions:
   contents: read
 jobs:
+  report-python-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      # Rocky Linux 9 preprocessing uses the system Python; newer Python accepts
+      # f-string quote reuse that fails at import time on this runtime.
+      - run: python -m compileall -q bin/adaptive_qc.py bin/report_presentation.py bin/sample_summary.py bin/make_report.py bin/preview_reports.py bin/read_length_qc.py
+      - run: python -m unittest discover -s tests -p 'test_report_presentation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_sample_summary.py' -v
   workflow:
     strategy:
       fail-fast: false

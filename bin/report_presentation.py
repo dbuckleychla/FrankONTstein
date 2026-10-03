@@ -56,7 +56,8 @@ def chart(title, series, xlabel, ylabel, logx=False, ymax=None, histogram=False,
     ticks=range(math.ceil(lo),math.floor(hi)+1) if logx else [lo+(hi-lo)*i/5 for i in range(6)]
     for tick in ticks:
         value=10**tick if logx else tick; px=xpixel(value)
-        s.append(f'<text x="{px}" y="305" text-anchor="middle" font-size="12">{format(value, ',.2f' if hi<=1 else ',.0f')}</text>')
+        tick_label=format(value, ',.2f' if hi<=1 else ',.0f')
+        s.append(f'<text x="{px}" y="305" text-anchor="middle" font-size="12">{tick_label}</text>')
     colors=['#007b91','#d47827','#7358aa','#438343']
     for i,(name,points) in enumerate(series):
         color=colors[i%len(colors)]; coords=' '.join(f'{xpixel(x):.2f},{ypixel(y):.2f}' for x,y in points)
