@@ -136,3 +136,14 @@ selection, hs1 exclusion, disabled QC and process failures with stubs.
 `tests/consensus.nf.test` checks module sample isolation; the existing tier/resume
 contracts include both new processes. Quarto/container and real reference-dependent
 validation must be reported separately from successful stub tests.
+
+Report/QC changes: see [regional QC and report validation](../documentation/reporting-and-regional-qc.md).
+Run `python -m unittest discover -s tests -p 'test_report_presentation.py' -v`
+alongside QC, summary, and publication tests. Use real BAM length audits and
+separate report previews to check existing-run compatibility; preserve originals.
+
+Local report preview validation (2026-10-02): conda `samtools` supplies pysam
+0.23.3. Nextflow 26.04.6 plan and tier/resume/failure routing checks were exercised.
+Production Quarto rendering and browser screenshots remain unverified in this
+sandbox (architecture probe denied; browser launch failed). Installed Pandoc can
+render the explicit preview fallback; this is not a Quarto runtime validation.

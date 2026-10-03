@@ -230,3 +230,14 @@
   inspection does not authorize deployment, instance termination or IAM changes.
 - Documentation-only changes require consistency/link review, not an unnecessary
   full scientific rerun. Keep this file aligned with intentional contract changes.
+
+## Report presentation and regional lengths
+- Report QC schema v2 adds on-target/off-target read lengths alongside existing
+  enrichment groups. These are overlapping comparisons using primary aligned
+  blocks; unmapped reads remain separate. Preserve exact length statistics.
+- Use shared offline presentation helpers. Display QC lengths as whole bp, depth
+  with one decimal and percentages with one decimal; preserve JSON/TSV precision.
+- Show NASVAR evidence in labeled tables and embed selected small plots. Preserve
+  native reports, warnings, caller separation and missing-versus-zero status.
+- Existing-run previews must be separate from originals. Focused length audits
+  require the exact region BEDs and must agree with existing length aggregates.

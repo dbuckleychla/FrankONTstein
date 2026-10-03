@@ -94,6 +94,16 @@ def primary_contig(chrom):
     return bool(match and (1 <= int(match[1]) <= 24 or 60925 <= int(match[1]) <= 60948))
 
 
+def read_length_groups(read, enrichment, targets):
+    """Each primary record counted once; D/N gaps do not confer overlap."""
+    if read.is_secondary or read.is_supplementary: return []
+    if read.is_unmapped: return ['all','unmapped']
+    blocks=read.get_blocks()
+    on=any(next(enrichment.hits(a,b),None) is not None for a,b in blocks)
+    target=any(next(targets.hits(a,b),None) is not None for a,b in blocks)
+    return ['all','mapped','on_enrichment' if on else 'off_enrichment','on_target' if target else 'off_target']
+
+
 def contig_qc(job):
     bam_path, chrom, size, erows, trows = job
     e = Regions(merged(erows)); t = Regions(merged(trows)); targets = Regions(trows)
@@ -110,8 +120,7 @@ def contig_qc(job):
             counts['qc_failed_primary'] += int(read.is_qcfail)
             counts['duplicate_flagged_primary'] += int(read.is_duplicate)
             length = read.query_length or read.infer_query_length() or 0
-            on = any(next(e.hits(a,b), None) is not None for a,b in read.get_blocks())
-            for key in ['all','mapped', 'on_enrichment' if on else 'off_enrichment']:
+            for key in read_length_groups(read,e,t):
                 groups[key][length] += 1
             mapq[read.mapping_quality] += 1
     sizes = {'genome': size, 'enrichment':sum(b-a for a,b in e.rows),
@@ -161,7 +170,7 @@ def bam_qc(bam, fasta, enrichment, targets, threads):
             if read.is_secondary or read.is_supplementary: continue
             n=read.query_length or read.infer_query_length() or 0
             groups['all'][n]+=1; groups['unmapped'][n]+=1
-    stats={k:lengths_summary(groups[k]) for k in ['all','mapped','unmapped','on_enrichment','off_enrichment']}
+    stats={k:lengths_summary(groups[k]) for k in ['all','mapped','unmapped','on_enrichment','off_enrichment','on_target','off_target']}
     counts['primary_reads']=stats['all']['reads']; counts['unmapped_primary']=stats['unmapped']['reads']
     mapped=counts['mapped_primary']; total=counts['primary_reads']; on=stats['on_enrichment']['reads']
     coverage={}
@@ -293,34 +302,15 @@ def plot(hist,title):
 
 
 def render_report(data):
-    bam=data['alignment']; meth=data['methylation']; esc=lambda v:html.escape(str(v))
-    sections=[f'<h1>{esc(data["sample"])} QC</h1>', '<p>Primary alignments; coverage includes duplicate/QC-failed flags and excludes deletions, skips, secondary and supplementary alignments. Lengths are sequenced query lengths. CpG beta uses valid modification calls.</p>']
-    sections.append('<h2>Input yield</h2><pre>'+esc(json.dumps(data.get('input_yield', {}),indent=2))+'</pre>')
-    sections.append('<h2>Yield and alignment</h2><pre>'+esc(json.dumps({**bam['counts'],'alignment_rate':bam['alignment_rate'],'on_enrichment_fraction_mapped':bam['on_enrichment_fraction_mapped'],'on_enrichment_fraction_all':bam['on_enrichment_fraction_all']},indent=2))+'</pre>')
-    sections.append('<h2>Read lengths</h2><table><tr><th>Group</th><th>Reads</th><th>Bases</th><th>Mean</th><th>Median</th><th>N50</th></tr>')
-    for k,d in bam['read_lengths'].items(): sections.append('<tr>'+''.join('<td>'+esc(v)+'</td>' for v in [k,d['reads'],d['bases'],d['mean'],d['median'],d['n50']])+'</tr>')
-    sections.append('</table>')
-    for k,d in bam['read_lengths'].items(): sections.append(plot(d['histogram'],f'{k}: length (bp) / read count'))
-    sections.append(plot(bam['mapq'],'Mapping quality / primary read count'))
-    sections.append('<h2>Coverage</h2><table><tr><th>MAPQ ≥</th><th>Scope</th><th>Mean depth</th><th>Breadth 1× / 5× / 10× / 20×</th></tr>')
-    for q,scopes in bam['coverage'].items():
-        for scope,d in scopes.items():
-            if not isinstance(d,dict): continue
-            sections.append('<tr>'+''.join('<td>'+esc(v)+'</td>' for v in [q,scope,d['mean'],list(d['breadth'].values())])+'</tr>')
-    sections.append('</table>')
-    for q,scopes in bam['coverage'].items():
-        for scope,d in scopes.items():
-            if isinstance(d,dict): sections.append(plot(d['histogram'],f'{scope}: depth / bases at MAPQ ≥{q}'))
-    for scope,mods in meth.items():
-        sections.append(f'<h2>CpG methylation: {esc(scope)}</h2>')
-        for mod,d in mods.items():
-            if not d['available']: sections.append(f'<p>{mod}: unavailable</p>'); continue
-            sections.append('<pre>'+esc(json.dumps({k:v for k,v in d.items() if 'hist' not in k},indent=2))+'</pre>')
-            sections.extend([plot(d['beta_hist'],mod+' beta (0–99 percent bins) / sites'),plot(d['beta_hist_depth10'],mod+' beta at depth ≥10'),plot(d['depth_hist'],mod+' valid depth / sites')])
-    sections.append('<h2>Warnings</h2><pre>'+esc('\n'.join(data.get('warnings', [])) or 'None')+'</pre>')
-    sections.append('<h2>Input/preprocessing: '+esc(data.get('input_run',data['sample']))+'</h2><pre>'+esc(json.dumps(data['preprocessing'],indent=2))+'</pre>')
-    sections.append('<p>Observed enrichment is not a measurement of adaptive-sampling acceptance/rejection decisions. Undefined metrics are null; no clinical pass/fail thresholds are applied.</p>')
-    return '<!doctype html><meta charset="utf-8"><title>Sample QC</title><style>body{font-family:system-ui;margin:2em}td,th{padding:.4em;border:1px solid #ddd}table{border-collapse:collapse}pre{white-space:pre-wrap}</style>'+''.join(sections)
+    from report_presentation import page, qc_content, table, esc, metric_rows
+    content = '<h1>'+esc(data['sample'])+' QC</h1>'
+    content += table(['Review warnings'], [[w] for w in data.get('warnings', [])], empty='No recorded QC warnings.')
+    content += qc_content(data)
+    content += '<h2>Input yield and provenance</h2>'
+    content += table(['Metric','Value'], metric_rows(data.get('input_yield',{})))
+    content += '<details><summary>Preprocessing details</summary>'+table(['Artifact','Details'],metric_rows(data.get('preprocessing',{})))+'</details>'
+    content += '<p>Observed enrichment does not measure adaptive-sampling acceptance/rejection decisions. No clinical pass/fail thresholds are applied.</p>'
+    return page(data['sample']+' QC',content)
 
 
 def main():
@@ -330,7 +320,7 @@ def main():
     a=p.parse_args()
     if a.threads < 1: p.error('--threads must be at least 1')
     Path('qc').mkdir(exist_ok=True)
-    data=dict(schema_version=1,sample=a.sample,alignment=bam_qc(a.bam,a.fasta,a.enrichment,a.targets,a.threads),
+    data=dict(schema_version=2,sample=a.sample,alignment=bam_qc(a.bam,a.fasta,a.enrichment,a.targets,a.threads),
               methylation=parallel_methylation(a.bedmethyl,a.fasta,a.enrichment,a.targets,a.threads),
               preprocessing={Path(f).name:json.loads(Path(f).read_text()) for f in a.preprocessing})
     data['warnings'] = []
@@ -358,7 +348,7 @@ def main():
                          'modified_read_fraction':raw.get('modified_reads',0)/raw['reads'] if raw.get('reads') else None}
     trimmed=data['preprocessing'].get('trim_qc.json')
     if trimmed: data['input_yield']['post_trim']={k:trimmed.get(k) for k in ['reads','bases','modified_reads']}
-    data['definitions']={'aggregate_coverage_and_cpg_contigs':'primary chromosomes 1–22/X/Y; other contigs reported separately','coverage_mapq':[0,20], 'read_overlap':'any aligned query base in merged enrichment intervals', 'coverage_flags':'primary, including duplicate and QC-failed flags','beta':'modified / valid calls', 'cpg_regions':'dyad forward-C coordinate'}
+    data['definitions']={'aggregate_coverage_and_cpg_contigs':'primary chromosomes 1–22/X/Y; other contigs reported separately','coverage_mapq':[0,20], 'read_overlap':'any aligned block overlaps merged target or enrichment intervals; target and enrichment scopes overlap; off scopes are mapped-primary complements; unmapped separate', 'coverage_flags':'primary, including duplicate and QC-failed flags','beta':'modified / valid calls', 'cpg_regions':'dyad forward-C coordinate'}
     Path('qc/metrics.json').write_text(json.dumps(data,indent=2,allow_nan=False))
     Path('qc/index.html').write_text(render_report(data))
     with open('qc/targets.tsv','w') as out:

@@ -44,11 +44,19 @@ class QCTests(unittest.TestCase):
         self.assertEqual(d['read_lengths']['all']['n50'],10)
         self.assertEqual(d['read_lengths']['all']['median'],10)
         self.assertEqual(d['on_enrichment_fraction_mapped'],2/3)
+        self.assertEqual(d['read_lengths']['on_target']['reads'],1)
+        self.assertEqual(d['read_lengths']['off_target']['reads'],2)
         self.assertEqual(d['coverage']['0']['enrichment']['bases'],15)
         self.assertEqual(d['coverage']['0']['genome']['aligned_bases'],40)
         self.assertEqual(d['coverage']['20']['genome']['aligned_bases'],30)
         self.assertEqual(d['coverage']['20']['enrichment']['aligned_bases'],10)
         self.assertEqual(d['coverage']['0']['genome']['breadth']['1'],.4)
+    def test_focused_length_audit_matches_pipeline(self):
+        from read_length_qc import collect
+        audit=collect(self.bam,self.enrichment,self.targets)
+        full=qc.bam_qc(str(self.bam),str(self.fasta),str(self.enrichment),str(self.targets),2)
+        self.assertEqual(audit,full['read_lengths'])
+
     def test_cpg_denominators(self):
         d=qc.methylation_qc(str(self.bed),str(self.fasta),str(self.enrichment),str(self.targets))
         c=d['genome']['combined']
@@ -95,6 +103,22 @@ class QCTests(unittest.TestCase):
         pysam.tabix_compress(str(raw),str(self.bed),force=True)
         pysam.tabix_index(str(self.bed),preset='bed',force=True)
         self.assertEqual(d,qc.parallel_methylation(str(self.bed),str(self.fasta),str(self.enrichment),str(self.targets),2))
+
+    def test_read_length_overlap_blocks_and_flags(self):
+        e=qc.Regions([(0,100)]);t=qc.Regions([(10,20)])
+        r=pysam.AlignedSegment();r.query_sequence='A'*20;r.reference_id=0;r.reference_start=0
+        for cigar in ['10M10D10M','10M10N10M']:
+            r.cigarstring=cigar
+            self.assertIn('off_target',qc.read_length_groups(r,e,t))
+            self.assertIn('on_enrichment',qc.read_length_groups(r,e,t))
+        r.cigarstring='20M'
+        self.assertIn('on_target',qc.read_length_groups(r,e,t))
+        for flag in [256,2048]:
+            r.flag=flag;self.assertEqual(qc.read_length_groups(r,e,t),[])
+        r.flag=4;self.assertEqual(qc.read_length_groups(r,e,t),['all','unmapped'])
+        r.flag=1024|512;self.assertIn('on_target',qc.read_length_groups(r,e,t))
+        self.assertEqual(qc.lengths_summary({10:1,20:1})['median'],15)
+        self.assertEqual(qc.lengths_summary({10:1,20:1})['n50'],20)
 
     def test_zero_metrics(self):
         self.assertIsNone(qc.lengths_summary({})['mean'])

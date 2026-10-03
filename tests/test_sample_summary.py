@@ -16,8 +16,18 @@ class SummaryTests(unittest.TestCase):
             (p/'S_combined_classification_combined_top_calls.tsv').write_text('classifier_domain\tclassification_task\tsource_label\tdisplay_label\trank\tscore\n'+'blood\tcancer_classification\tMODEL\t<script>alert(1)</script>\t1\t0.1\n')
             data=ss.load('S',p,context);self.assertIsNone(data['consensus']['counts']);self.assertEqual(data['analyses']['qc'],'disabled')
             qmd=ss.render(data,ROOT/'assets/summary/template.qmd');self.assertIn('&lt;script&gt;',qmd);self.assertNotIn('<script>alert',qmd)
+            self.assertLess(qmd.index('## Fusion summary'),qmd.index('## Quality control'))
+            self.assertLess(qmd.index('## Fusion summary'),qmd.index('## NASVAR copy number'))
+            self.assertLess(qmd.index('## Somatic consensus'),qmd.index('## Quality control'))
             (p/'metrics.json').write_text('{"sample":"OTHER"}')
             with self.assertRaises(ValueError):ss.load('S',p,context)
+    def test_native_stellerator_name_is_preserved(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d);(p/'S.tsv').write_text('gene1\tgene2\nA\tB\n')
+            data=ss.load('S',p,{'plan':{'genome':'hg38','tier':'tertiary','callers':['stellerator']}})
+            self.assertEqual(data['fusions']['candidates'][0]['source'],'Stellerator')
+            self.assertIn('Stellerator evidence',ss.fusion_table(data))
+
     def test_missing_required_consensus_fails(self):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(ValueError):ss.load('S',d,{'plan':{'genome':'hg38','tier':'tertiary','callers':['deepsomatic','clairsto']}})
